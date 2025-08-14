@@ -117,7 +117,7 @@ export const separateCodeAndText = (response: string): { code: string; descripti
     const codeBlockRegex = /```[\s\S]*?```/g
     const fileBlockRegex = /\/\/\/ file: [\s\S]*?(?=\/\/\/ (?:file:|endfile)|$)/g
     
-    let codeBlocks: string[] = []
+    const codeBlocks: string[] = []
     let cleanedResponse = response
     
     // Find all code blocks with ```
@@ -143,6 +143,10 @@ export const separateCodeAndText = (response: string): { code: string; descripti
     const description = cleanedResponse
       .replace(/\/\/\/ endfile/g, '')
       .replace(/^\s*[\r\n]/gm, '') // Remove empty lines
+      .replace(/\*\*(.*?)\*\*/g, '$1') // Remove markdown bold formatting
+      .replace(/- /g, '• ') // Replace dashes with bullets
+      .replace(/(?:\r\n|\r|\n)/g, '\n') // Normalize line endings
+      .replace(/\n\s*\n\s*\n/g, '\n\n') // Replace multiple newlines with double newlines
       .trim()
     
     // Join all code blocks

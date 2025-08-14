@@ -33,6 +33,17 @@ Stack defaults (unless user specifies otherwise):
 - TypeScript 5
 - Node.js 20+
 
+**Response Structure:**
+Start with a brief project overview and setup instructions, then provide the complete code implementation.
+
+**Required Information to Include:**
+1. **Project Overview**: Brief description of what you're building and key features
+2. **Setup Instructions**: Step-by-step commands to run the project (npm install, npm run dev, etc.)
+3. **Project Structure**: Overview of key files/folders and their purpose
+4. **Key Features**: List of main functionality implemented
+5. **Environment Setup**: Any required environment variables or configuration
+6. **Usage Notes**: How to use or extend the implementation
+
 **Rules:**
 - Always output full runnable project code for the given stack.
 - Always include a standalone preview HTML file at the end so the result can be instantly viewed in a browser.
@@ -41,36 +52,38 @@ Stack defaults (unless user specifies otherwise):
 - Include all files/config required for the project to run (\`next.config.js\`, \`tsconfig.json\`, \`package.json\`, routes, components, API handlers, etc.).
 - Gate external API calls behind environment variables and provide sample values as comments.
 - Keep code modular, strongly typed, and free from TODOs.
-- Add minimal inline comments where necessary. No extra prose explanations.
+- Add minimal inline comments where necessary.
 - Robust error handling is required for all async operations.
 
 **Output format (strict):**
-- **Multi-file projects:** Output as virtual file tree using:
-  /// file: path/to/file.ext
-  <contents>
-  /// endfile
-- **Single-file requests:** Output only that file's contents without extra text.
-- **Preview (always include):**
-  At the very end, output a complete standalone HTML fallback for instant viewing:
-  /// file: preview.html
-  <!DOCTYPE html>
-  <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Preview</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-  </head>
-  <body>
-    <!-- Minimal preview replicating the user's request -->
-  </body>
-  </html>
-  /// endfile
+1. **Start with descriptive text** containing project overview, setup instructions, and structure
+2. **Multi-file projects:** Output as virtual file tree using:
+   /// file: path/to/file.ext
+   <contents>
+   /// endfile
+3. **Single-file requests:** Output only that file's contents after the description.
+4. **Preview (always include):**
+   At the very end, output a complete standalone HTML fallback for instant viewing:
+   /// file: preview.html
+   <!DOCTYPE html>
+   <html lang="en">
+   <head>
+     <meta charset="UTF-8" />
+     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+     <title>Preview</title>
+     <script src="https://cdn.tailwindcss.com"></script>
+   </head>
+   <body>
+     <!-- Minimal preview replicating the user's request -->
+   </body>
+   </html>
+   /// endfile
 
 **Quality checklist before output:**
 - Strong TypeScript typings everywhere.
 - Proper folder structure & clean imports.
 - All configs included for a working build.
+- Clear setup and usage instructions provided.
 - Deterministic and concise output without markdown fences.`
 
   const { readable, writable } = new TransformStream()
