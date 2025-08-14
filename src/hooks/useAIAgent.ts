@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { GeneratedContent, AIAgentState } from '@/types'
+import { GeneratedContent, AIAgentState, ConversationMessage } from '@/types'
 import { extractPreviewFromHTML, separateCodeAndText } from '@/libs/utils'
 
 export const useAIAgent = () => {
@@ -9,7 +9,9 @@ export const useAIAgent = () => {
     generatedContent: null,
     activeTab: 'code',
     copiedCode: false,
-    lastPrompt: ''
+    lastPrompt: '',
+    conversationHistory: [],
+    isFirstRequest: true
   })
 
   const handleInputChange = (value: string) => {
@@ -20,18 +22,24 @@ export const useAIAgent = () => {
     e.preventDefault()
     if (!state.input.trim()) return
 
+    const currentPrompt = state.input
+
     setState(prev => ({
       ...prev,
       isLoading: true,
       generatedContent: null,
-      lastPrompt: prev.input
+      lastPrompt: currentPrompt
     }))
 
     try {
       const res = await fetch('/api/generate/stream', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prompt: state.input })
+        body: JSON.stringify({ 
+          prompt: currentPrompt,
+          conversationHistory: state.conversationHistory,
+          isFirstRequest: state.isFirstRequest
+        })
       })
       if (!res.ok || !res.body) {
         throw new Error('Failed to generate')
@@ -58,7 +66,26 @@ export const useAIAgent = () => {
         }))
       }
 
-      setState(prev => ({ ...prev, isLoading: false }))
+      // Add messages to conversation history
+      const newUserMessage: ConversationMessage = {
+        role: 'user',
+        content: currentPrompt,
+        timestamp: Date.now()
+      }
+
+      const newAssistantMessage: ConversationMessage = {
+        role: 'assistant', 
+        content: aggregated,
+        timestamp: Date.now()
+      }
+
+      setState(prev => ({ 
+        ...prev, 
+        isLoading: false,
+        input: '', // Clear input after successful submission
+        conversationHistory: [...prev.conversationHistory, newUserMessage, newAssistantMessage],
+        isFirstRequest: false // No longer the first request
+      }))
     } catch (error) {
       console.error('Error generating content:', error)
       setState(prev => ({ ...prev, isLoading: false }))

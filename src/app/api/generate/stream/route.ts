@@ -5,7 +5,7 @@ export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
 export async function POST(req: NextRequest) {
-  const { prompt } = await req.json()
+  const { prompt, conversationHistory = [], isFirstRequest = true } = await req.json()
   if (!prompt || typeof prompt !== 'string') {
     return new Response('Invalid prompt', { status: 400 })
   }
@@ -25,7 +25,7 @@ export async function POST(req: NextRequest) {
     }
   })
 
-  const systemInstruction = `You are an expert software engineer. Generate production-quality, runnable code for the user's requested website or web application.
+  const firstRequestSystemInstruction = `You are an expert software engineer. Generate production-quality, runnable code for the user's requested website or web application.
 
 Stack defaults (unless user specifies otherwise):
 - Next.js 15 (App Router)
@@ -69,7 +69,7 @@ Start with a brief project overview and setup instructions, then provide the com
    <html lang="en">
    <head>
      <meta charset="UTF-8" />
-     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+     <meta name="viewport" content="width=device-width, initial-case=1.0" />
      <title>Preview</title>
      <script src="https://cdn.tailwindcss.com"></script>
    </head>
@@ -86,18 +86,61 @@ Start with a brief project overview and setup instructions, then provide the com
 - Clear setup and usage instructions provided.
 - Deterministic and concise output without markdown fences.`
 
+  const followUpSystemInstruction = `You are an expert software engineer continuing work on an existing project. The user is requesting modifications to code that already exists. Focus ONLY on the changes requested - do not regenerate project setup, overview, or boilerplate explanations.
+
+**Rules:**
+- Output ONLY the modified/new code files that need to change
+- Do not include project setup, installation instructions, or detailed explanations
+- Reference the conversation history to understand the current state of the project
+- Make targeted changes that build upon the existing codebase
+- Use the same patterns and structure as the existing code
+- Keep responses concise and focused only on the requested changes
+
+**Output format (strict):**
+- For modified files, emit only the changed files using:
+  /// file: path/to/file.ext
+  <updated file contents>
+  /// endfile
+
+- Update the preview.html ONLY if the visual component needs to change:
+  /// file: preview.html
+  <!DOCTYPE html>
+  <html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Preview</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+  </head>
+  <body>
+    <!-- Updated preview reflecting the changes -->
+  </body>
+  </html>
+  /// endfile
+
+**Quality checklist:**
+- Only output files that actually changed
+- Maintain consistency with existing code structure
+- No project setup or overview content`
+
+  const systemInstruction = isFirstRequest ? firstRequestSystemInstruction : followUpSystemInstruction
+
   const { readable, writable } = new TransformStream()
   const writer = writable.getWriter()
   const encoder = new TextEncoder()
 
   ;(async () => {
     try {
+      // Build messages array with conversation history
+      const messages = [
+        { role: 'system', content: systemInstruction },
+        ...conversationHistory.map((msg: any) => ({ role: msg.role, content: msg.content })),
+        { role: 'user', content: prompt }
+      ]
+
       const stream = await openai.chat.completions.create({
         model: 'openai/gpt-oss-20b:free',
-        messages: [
-          { role: 'system', content: systemInstruction },
-          { role: 'user', content: prompt }
-        ],
+        messages,
         stream: true
       })
 

@@ -47,7 +47,7 @@ export const ResultsSection = ({
         </button>
       </div>
 
-      <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl overflow-hidden shadow-[0_10px_40px_rgba(0,0,0,0.35)] h-[calc(100vh-300px)]">
+      <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl overflow-hidden shadow-[0_10px_40px_rgba(0,0,0,0.35)] h-[calc(100vh-400px)]">
         {activeTab === 'preview' ? (
           <div className="p-6 h-full overflow-auto">
             <h3 className="text-lg font-semibold text-white mb-4 flex items-center">

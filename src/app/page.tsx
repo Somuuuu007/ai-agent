@@ -117,10 +117,10 @@ export default function AIAgentPage() {
                 />
               </div>
               
-              <div className="flex-1 overflow-y-auto px-4 pb-4 scrollbar-thin">
+              <div className="flex-1 overflow-y-auto pl-4 pr-0 pb-4 scrollbar-thin">
                 <div className="space-y-3 max-w-3xl mx-auto w-full">
                   <div className="flex justify-end pr-1">
-                    <div className="max-w-lg text-white text-sm">
+                    <div className="max-w-lg bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl p-4 text-white text-sm shadow-[inset_0_1px_0_0_rgba(255,255,255,0.06)]">
                       {lastPrompt}
                     </div>
                   </div>
@@ -181,7 +181,7 @@ export default function AIAgentPage() {
           <Footer />
         </div>
 
-        <div ref={rightRef} className="opacity-0 min-w-0 flex flex-col h-screen overflow-hidden relative z-10">
+        <div ref={rightRef} className="opacity-0 min-w-0 flex flex-col h-[calc(100vh-2rem)] overflow-hidden relative z-10">
           {generatedContent && (
             <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl overflow-hidden shadow-[0_10px_40px_rgba(0,0,0,0.5)] w-full h-full flex flex-col">
                <div className="p-3 border-b border-white/10 flex items-center space-x-2 flex-shrink-0">
@@ -235,7 +235,7 @@ export default function AIAgentPage() {
                           // Complete HTML document - use iframe
                           <iframe
                             srcDoc={generatedContent.preview}
-                            className="w-full h-[75vh] border border-gray-300 rounded"
+                            className="w-full h-[60vh] border border-gray-300 rounded"
                             title="Preview"
                             sandbox="allow-scripts allow-same-origin"
                           />
@@ -252,7 +252,15 @@ export default function AIAgentPage() {
                   <div className="h-full overflow-y-auto p-6 min-w-0">
                     <div className="bg-white rounded-lg p-4 shadow-lg min-w-0">
                       <pre className="text-xs text-gray-800 bg-black/5 rounded-md p-4 overflow-x-auto whitespace-pre-wrap break-words">
-                        <code>{generatedContent?.code || ''}</code>
+                        <code>{(() => {
+                          const code = generatedContent?.code || '';
+                          // Filter out preview.html from the code display
+                          if (code.includes('/// file: preview.html')) {
+                            const beforePreview = code.split('/// file: preview.html')[0];
+                            return beforePreview.trim();
+                          }
+                          return code;
+                        })()}</code>
                   </pre>
                     </div>
                   </div>

@@ -5,8 +5,13 @@ import './globals.css'
 const inter = Inter({ subsets: ['latin'] })
 
 export const metadata: Metadata = {
-  title: 'AI Agent - Transform Ideas to Code',
+  title: 'Vidon - Its Easier To Build',
   description: 'AI-powered tool to generate web components with live preview and code',
+  icons: {
+    icon: '/vidon-logo.png',
+    shortcut: '/vidon-logo.png',
+    apple: '/vidon-logo.png',
+  }
 }
 
 export default function RootLayout({
