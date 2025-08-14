@@ -48,6 +48,7 @@ export const useAIAgent = () => {
       const reader = res.body.getReader()
       const decoder = new TextDecoder()
       let aggregated = ''
+      let finalContent: GeneratedContent | null = null
 
       while (true) {
         const { done, value } = await reader.read()
@@ -56,13 +57,11 @@ export const useAIAgent = () => {
 
         const preview = extractPreviewFromHTML(aggregated)
         const { code, description } = separateCodeAndText(aggregated)
+        finalContent = { preview, code, description }
+        
         setState(prev => ({
           ...prev,
-          generatedContent: {
-            preview,
-            code,
-            description
-          }
+          generatedContent: finalContent
         }))
       }
 
@@ -75,7 +74,7 @@ export const useAIAgent = () => {
 
       const newAssistantMessage: ConversationMessage = {
         role: 'assistant', 
-        content: aggregated,
+        content: finalContent?.description || aggregated,
         timestamp: Date.now()
       }
 

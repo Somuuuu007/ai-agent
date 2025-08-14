@@ -21,7 +21,8 @@ export default function AIAgentPage() {
     handleSubmit,
     setActiveTab,
     copyToClipboard,
-    lastPrompt
+    lastPrompt,
+    conversationHistory
   } = useAIAgent()
 
   const [showOutput, setShowOutput] = useState(false)
@@ -119,35 +120,58 @@ export default function AIAgentPage() {
               
               <div className="flex-1 overflow-y-auto pl-4 pr-0 pb-4 scrollbar-thin">
                 <div className="space-y-3 max-w-3xl mx-auto w-full">
-                  <div className="flex justify-end pr-1">
-                    <div className="max-w-lg bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl p-4 text-white text-sm shadow-[inset_0_1px_0_0_rgba(255,255,255,0.06)]">
-                      {lastPrompt}
+                  {/* Display conversation history */}
+                  {conversationHistory.map((message, index) => (
+                    <div key={index} className={`flex ${message.role === 'user' ? 'justify-end pr-1' : 'justify-start pl-1'}`}>
+                      {message.role === 'user' ? (
+                        <div className="max-w-lg bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl p-4 text-white text-sm shadow-[inset_0_1px_0_0_rgba(255,255,255,0.06)]">
+                          {message.content}
+                        </div>
+                      ) : (
+                        <div className="max-w-3xl text-gray-200 text-sm">
+                          <div className="whitespace-pre-wrap leading-relaxed">
+                            {message.content}
+                          </div>
+                        </div>
+                      )}
                     </div>
-                  </div>
+                  ))}
                   
-                  {(isLoading || generatedContent) && (
-                    <div className="flex justify-start pl-1">
-                      <div className="max-w-3xl text-gray-200 text-sm">
-                        {isLoading ? (
+                  {/* Loading state - show current request and loading */}
+                  {isLoading && lastPrompt && !conversationHistory.some(msg => msg.content === lastPrompt) && (
+                    <>
+                      <div className="flex justify-end pr-1">
+                        <div className="max-w-lg bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl p-4 text-white text-sm shadow-[inset_0_1px_0_0_rgba(255,255,255,0.06)]">
+                          {lastPrompt}
+                        </div>
+                      </div>
+                      <div className="flex justify-start pl-1">
+                        <div className="max-w-3xl text-gray-200 text-sm">
                           <div className="inline-flex items-center">
                             <Loader2 className="h-3.5 w-3.5 animate-spin mr-2" />
                             Generating output...
                           </div>
-                        ) : (
-                          <div>
-                            <div className="inline-flex items-center mb-2">
-                              <Sparkles className="h-3.5 w-3.5 mr-2 text-purple-400" />
-                              <span className="font-medium">AI Response</span>
-                            </div>
-                            <div className="prose prose-sm text-gray-200 max-w-none">
-                              <div className="whitespace-pre-wrap leading-relaxed">
-                                {generatedContent?.description || 'Output generated. Show output to view.'}
-                              </div>
-                            </div>
-                          </div>
-                        )}
+                        </div>
                       </div>
-                    </div>
+                    </>
+                  )}
+                  
+                  {/* Current streaming response - show only if not in history yet */}
+                  {!isLoading && generatedContent && lastPrompt && !conversationHistory.some(msg => msg.content === lastPrompt) && (
+                    <>
+                      <div className="flex justify-end pr-1">
+                        <div className="max-w-lg bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl p-4 text-white text-sm shadow-[inset_0_1px_0_0_rgba(255,255,255,0.06)]">
+                          {lastPrompt}
+                        </div>
+                      </div>
+                      <div className="flex justify-start pl-1">
+                        <div className="max-w-3xl text-gray-200 text-sm">
+                          <div className="whitespace-pre-wrap leading-relaxed">
+                            {generatedContent.description || 'Output generated. Show output to view.'}
+                          </div>
+                        </div>
+                      </div>
+                    </>
                   )}
                   
                   {generatedContent && (
@@ -252,15 +276,7 @@ export default function AIAgentPage() {
                   <div className="h-full overflow-y-auto p-6 min-w-0">
                     <div className="bg-white rounded-lg p-4 shadow-lg min-w-0">
                       <pre className="text-xs text-gray-800 bg-black/5 rounded-md p-4 overflow-x-auto whitespace-pre-wrap break-words">
-                        <code>{(() => {
-                          const code = generatedContent?.code || '';
-                          // Filter out preview.html from the code display
-                          if (code.includes('/// file: preview.html')) {
-                            const beforePreview = code.split('/// file: preview.html')[0];
-                            return beforePreview.trim();
-                          }
-                          return code;
-                        })()}</code>
+                        <code>{generatedContent?.code || ''}</code>
                   </pre>
                     </div>
                   </div>

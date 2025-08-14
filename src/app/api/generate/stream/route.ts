@@ -54,6 +54,8 @@ Start with a brief project overview and setup instructions, then provide the com
 - Keep code modular, strongly typed, and free from TODOs.
 - Add minimal inline comments where necessary.
 - Robust error handling is required for all async operations.
+- The preview.html must always use the same UI as the main project and be functional without any build step, using Tailwind CDN for styles.
+
 
 **Output format (strict):**
 1. **Start with descriptive text** containing project overview, setup instructions, and structure
@@ -95,6 +97,9 @@ Start with a brief project overview and setup instructions, then provide the com
 - Make targeted changes that build upon the existing codebase
 - Use the same patterns and structure as the existing code
 - Keep responses concise and focused only on the requested changes
+- If the change affects visual output, also update preview.html to match the changes.
+- Do NOT regenerate unchanged files. Only output modified or new files.
+
 
 **Output format (strict):**
 - For modified files, emit only the changed files using:

@@ -113,30 +113,26 @@ export const extractPreviewFromHTML = (response: string): string => {
 
 export const separateCodeAndText = (response: string): { code: string; description: string } => {
   try {
-    // Extract all code blocks (both ``` and /// file: blocks)
-    const codeBlockRegex = /```[\s\S]*?```/g
+    // Extract all file blocks (/// file: blocks)
     const fileBlockRegex = /\/\/\/ file: [\s\S]*?(?=\/\/\/ (?:file:|endfile)|$)/g
     
-    const codeBlocks: string[] = []
     let cleanedResponse = response
+    let allCode = ''
     
-    // Find all code blocks with ```
-    const markdownCodeBlocks = response.match(codeBlockRegex) || []
-    codeBlocks.push(...markdownCodeBlocks)
-    
-    // Find all file blocks with /// file: (excluding preview.html)
+    // Find all file blocks
     const fileBlocks = response.match(fileBlockRegex) || []
-    const filteredFileBlocks = fileBlocks.filter(block => !block.includes('/// file: preview.html'))
-    codeBlocks.push(...filteredFileBlocks)
     
-    // Remove code blocks from response to get description text
-    markdownCodeBlocks.forEach(block => {
-      cleanedResponse = cleanedResponse.replace(block, '')
-    })
+    // Separate code blocks (excluding preview.html) from description text
+    const codeBlocks: string[] = []
     
-    // Remove all file blocks (including preview.html) from description
     fileBlocks.forEach(block => {
+      // Remove all file blocks from description
       cleanedResponse = cleanedResponse.replace(block, '')
+      
+      // Add non-preview file blocks to code
+      if (!block.includes('/// file: preview.html')) {
+        codeBlocks.push(block)
+      }
     })
     
     // Clean up the description text
@@ -152,15 +148,16 @@ export const separateCodeAndText = (response: string): { code: string; descripti
     // Join all code blocks
     const code = codeBlocks.join('\n\n').trim()
     
+    // If no code blocks found, return the full response as code (fallback)
     return {
-      code: code || response, // Fallback to original if no code blocks found
-      description: description || ''
+      code: code || response,
+      description: description || response
     }
   } catch (error) {
     console.error('Error separating code and text:', error)
     return {
       code: response,
-      description: ''
+      description: response
     }
   }
 }
