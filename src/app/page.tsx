@@ -3,8 +3,7 @@
 import { Eye, Code, Copy, Check, Loader2, Sparkles } from 'lucide-react'
 import { Header } from '@/components/ui/Header'
 import { InputSection } from '@/components/ui/InputSection'
-
- 
+import { FormattedResponse } from '@/components/ui/FormattedResponse'
 import { Footer } from '@/components/ui/Footer'
 import { useAIAgent } from '@/hooks/useAIAgent'
 import { useEffect, useRef, useState } from 'react'
@@ -22,7 +21,9 @@ export default function AIAgentPage() {
     setActiveTab,
     copyToClipboard,
     lastPrompt,
-    conversationHistory
+    conversationHistory,
+    livePreviewUrl,
+    projectId
   } = useAIAgent()
 
   const [showOutput, setShowOutput] = useState(false)
@@ -41,7 +42,7 @@ export default function AIAgentPage() {
       gsap.to(gridRef.current, {
         duration,
         ease,
-        gridTemplateColumns: showOutput ? '1fr 1fr' : '1fr 0fr'
+        gridTemplateColumns: showOutput ? '2fr 3fr' : '1fr 0fr'
       })
     }
     if (rightRef.current) {
@@ -119,7 +120,7 @@ export default function AIAgentPage() {
               </div>
               
               <div className="flex-1 overflow-y-auto pl-4 pr-0 pb-4 scrollbar-thin">
-                <div className="space-y-3 max-w-3xl mx-auto w-full">
+                <div className="space-y-8 max-w-3xl mx-auto w-full">
                   {/* Display conversation history */}
                   {conversationHistory.map((message, index) => (
                     <div key={index} className={`flex ${message.role === 'user' ? 'justify-end pr-1' : 'justify-start pl-1'}`}>
@@ -128,11 +129,7 @@ export default function AIAgentPage() {
                           {message.content}
                         </div>
                       ) : (
-                        <div className="max-w-3xl text-gray-200 text-sm">
-                          <div className="whitespace-pre-wrap leading-relaxed">
-                            {message.content}
-                          </div>
-                        </div>
+                        <FormattedResponse content={message.content} />
                       )}
                     </div>
                   ))}
@@ -165,11 +162,7 @@ export default function AIAgentPage() {
                         </div>
                       </div>
                       <div className="flex justify-start pl-1">
-                        <div className="max-w-3xl text-gray-200 text-sm">
-                          <div className="whitespace-pre-wrap leading-relaxed">
-                            {generatedContent.description || 'Output generated. Show output to view.'}
-                          </div>
-                        </div>
+                        <FormattedResponse content={generatedContent.description || 'Output generated. Show output to view.'} />
                       </div>
                     </>
                   )}
@@ -252,28 +245,64 @@ export default function AIAgentPage() {
               </div>
               <div className="flex-1 overflow-hidden">
                 {activeTab === 'preview' ? (
-                  <div className="h-full overflow-y-auto p-6">
+                  <div className="h-full overflow-y-auto p-6 scrollbar-thin">
                     <div className="bg-white rounded-lg p-4 shadow-lg">
-                      {generatedContent?.preview ? (
-                        generatedContent.preview.includes('<!DOCTYPE html>') ? (
-                          // Complete HTML document - use iframe
+                      {livePreviewUrl ? (
+                        // Live preview from running container
+                        <div className="space-y-4">
+                          <div className="flex items-center justify-between p-2 bg-green-50 border border-green-200 rounded">
+                            <div className="flex items-center space-x-2">
+                              <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                              <span className="text-green-700 text-sm font-medium">Live Preview Running</span>
+                            </div>
+                            <a 
+                              href={livePreviewUrl} 
+                              target="_blank" 
+                              rel="noopener noreferrer"
+                              className="text-green-600 hover:text-green-800 text-sm underline"
+                            >
+                              Open in new tab
+                            </a>
+                          </div>
                           <iframe
-                            srcDoc={generatedContent.preview}
+                            src={livePreviewUrl}
                             className="w-full h-[60vh] border border-gray-300 rounded"
-                            title="Preview"
-                            sandbox="allow-scripts allow-same-origin"
+                            title="Live Preview"
+                            sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
                           />
-                        ) : (
-                          // HTML fragment - use dangerouslySetInnerHTML
-                          <div dangerouslySetInnerHTML={{ __html: generatedContent.preview }} />
-                        )
+                        </div>
+                      ) : generatedContent?.preview ? (
+                        // Fallback to static preview.html
+                        <div className="space-y-4">
+                          <div className="flex items-center justify-between p-2 bg-yellow-50 border border-yellow-200 rounded">
+                            <div className="flex items-center space-x-2">
+                              <div className="w-2 h-2 bg-yellow-500 rounded-full"></div>
+                              <span className="text-yellow-700 text-sm font-medium">Static Preview</span>
+                            </div>
+                            {projectId && (
+                              <span className="text-yellow-600 text-sm">Building live preview...</span>
+                            )}
+                          </div>
+                          {generatedContent.preview.includes('<!DOCTYPE html>') ? (
+                            // Complete HTML document - use iframe
+                            <iframe
+                              srcDoc={generatedContent.preview}
+                              className="w-full h-[60vh] border border-gray-300 rounded"
+                              title="Preview"
+                              sandbox="allow-scripts allow-same-origin"
+                            />
+                          ) : (
+                            // HTML fragment - use dangerouslySetInnerHTML
+                            <div dangerouslySetInnerHTML={{ __html: generatedContent.preview }} />
+                          )}
+                        </div>
                       ) : (
                         <div className="text-gray-500 text-center py-8">No preview available</div>
                       )}
                     </div>
                   </div>
                 ) : (
-                  <div className="h-full overflow-y-auto p-6 min-w-0">
+                  <div className="h-full overflow-y-auto p-6 min-w-0 scrollbar-thin">
                     <div className="bg-white rounded-lg p-4 shadow-lg min-w-0">
                       <pre className="text-xs text-gray-800 bg-black/5 rounded-md p-4 overflow-x-auto whitespace-pre-wrap break-words">
                         <code>{generatedContent?.code || ''}</code>

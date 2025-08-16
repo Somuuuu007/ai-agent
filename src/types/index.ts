@@ -19,4 +19,17 @@ export interface GeneratedContent {
     lastPrompt: string
     conversationHistory: ConversationMessage[]
     isFirstRequest: boolean
+    livePreviewUrl?: string
+    projectId?: string
+  }
+
+  export interface ExtractedFile {
+    path: string
+    content: string
+  }
+
+  export interface LivePreviewData {
+    port: number
+    previewUrl: string
+    status: string
   }

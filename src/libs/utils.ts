@@ -1,6 +1,6 @@
 import { type ClassValue, clsx } from "clsx"
 import { twMerge } from "tailwind-merge"
-import { GeneratedContent } from "@/types"
+import { GeneratedContent, ExtractedFile } from "@/types"
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
@@ -159,5 +159,112 @@ export const separateCodeAndText = (response: string): { code: string; descripti
       code: response,
       description: response
     }
+  }
+}
+
+export const extractFilesFromResponse = (response: string): ExtractedFile[] => {
+  try {
+    const files: ExtractedFile[] = []
+    
+    // Split response by /// file: markers to handle them individually
+    const fileSections = response.split(/\/\/\/ file: /)
+    
+    // Skip the first section (everything before the first /// file:)
+    for (let i = 1; i < fileSections.length; i++) {
+      const section = fileSections[i]
+      
+      // Find the end of the filename (first newline)
+      const firstNewlineIndex = section.indexOf('\n')
+      if (firstNewlineIndex === -1) continue
+      
+      const filePath = section.substring(0, firstNewlineIndex).trim()
+      let content = section.substring(firstNewlineIndex + 1)
+      
+      // Skip preview.html files as they're handled separately
+      if (filePath === 'preview.html') {
+        continue
+      }
+      
+      // Clean up content by removing /// endfile if present
+      content = content.replace(/\/\/\/ endfile[\s\S]*$/, '').trim()
+      
+      // Remove markdown code block markers (more comprehensive)
+      // Remove opening markers: ```json, ```tsx, ```js, etc.
+      content = content.replace(/^```\w*\s*/g, '').trim()
+      
+      // Remove closing markers: ``` at end
+      content = content.replace(/\s*```\s*$/g, '').trim()
+      
+      // Remove any remaining standalone ``` lines
+      content = content.replace(/^\s*```\s*$/gm, '').trim()
+      
+      if (filePath && content) {
+        files.push({
+          path: filePath,
+          content: content
+        })
+      }
+    }
+    
+    return files
+  } catch (error) {
+    console.error('Error extracting files from response:', error)
+    return []
+  }
+}
+
+export const generateProjectId = (): string => {
+  return `proj-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+}
+
+export interface SaveProjectResponse {
+  success: boolean
+  projectId: string
+  savedFiles: number
+  projectPath: string
+  livePreview?: {
+    port: number
+    previewUrl: string
+    status: string
+  } | null
+  instructions: string
+}
+
+export const saveProjectFiles = async (projectId: string, files: ExtractedFile[]): Promise<SaveProjectResponse | null> => {
+  try {
+    const response = await fetch('/api/save-project', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        projectId,
+        files
+      })
+    })
+    
+    if (response.ok) {
+      return await response.json()
+    }
+    
+    return null
+  } catch (error) {
+    console.error('Error saving project files:', error)
+    return null
+  }
+}
+
+export const getLivePreview = async (projectId: string): Promise<{ previewUrl?: string, status: string } | null> => {
+  try {
+    const response = await fetch(`/api/live-preview/${projectId}`)
+    
+    if (response.ok) {
+      return await response.json()
+    }
+    
+    return null
+  } catch (error) {
+    console.error('Error getting live preview:', error)
+    return null
   }
 }
