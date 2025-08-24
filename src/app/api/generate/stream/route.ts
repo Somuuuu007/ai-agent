@@ -1,11 +1,16 @@
 import { NextRequest } from 'next/server'
 import OpenAI from 'openai'
+import { ConversationMessage } from '@/types'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
 export async function POST(req: NextRequest) {
-  const { prompt, conversationHistory = [], isFirstRequest = true } = await req.json()
+  const { prompt, conversationHistory = [], isFirstRequest = true }: {
+    prompt: string
+    conversationHistory: ConversationMessage[]
+    isFirstRequest: boolean
+  } = await req.json()
   if (!prompt || typeof prompt !== 'string') {
     return new Response('Invalid prompt', { status: 400 })
   }
@@ -32,17 +37,15 @@ export async function POST(req: NextRequest) {
 Stack defaults (unless user specifies otherwise):
 - React 18.3+ with Vite
 - TypeScript 5
-- Regular CSS (NO Tailwind unless explicitly requested)
+- Tailwind CSS (for styling)
 - Node.js 20+
 
 **Response Structure:**
 Start with a brief project overview and setup instructions, then provide the complete code implementation.
 
 **Required Information to Include:**
-1. **Project Overview**: Brief description of what you're building and key features
-2. **Setup Instructions**: Step-by-step commands to run the project (npm install, npm run dev, etc.)
+1. **Project Overview**: Brief description of what you're building 
 3. **Project Structure**: Overview of key files/folders and their purpose
-4. **Key Features**: List of main functionality implemented
 
 **Critical Production Rules:**
 - Always output full runnable project code for the given stack.
@@ -55,24 +58,27 @@ Start with a brief project overview and setup instructions, then provide the com
   * vite.config.ts (REQUIRED - with @/ alias configuration)
   * index.html (REQUIRED - entry point for Vite)
   * src/main.tsx (REQUIRED - React app entry point)
-  * tailwind.config.js (ONLY if explicitly using Tailwind CSS)
-  * postcss.config.js (ONLY if explicitly using Tailwind CSS)
+  * tailwind.config.js (REQUIRED - Tailwind configuration)
+  * postcss.config.js (REQUIRED - PostCSS configuration for Tailwind)
   * All components, pages, utilities, etc.
 - Gate external API calls behind environment variables and provide sample values as comments.
 - Keep code modular, strongly typed, and free from TODOs.
 - Add minimal inline comments where necessary.
 - Robust error handling is required for all async operations.
 - The preview.html must always use the same UI as the main project and be functional without any build step, using Tailwind CDN for styles.
+- ALL projects should use Tailwind CSS classes by default for styling and responsive design.
 
 **CRITICAL DEPENDENCY & IMPORT RULES:**
-- React version MUST be "^18.3.0" for modern React features
-- @types/react MUST be "^18.3.0" to match React version
+- React version MUST be "^18.3.1" for modern React features
+- @types/react MUST be "^18.3.3" to match React version
 - Use @/ imports for all local components (e.g., import Header from '@/components/Header')
 - @/ aliases are configured via Vite's resolve.alias in vite.config.ts
 - ALL build tools (tailwindcss, autoprefixer, postcss) go in devDependencies ONLY
 - NEVER duplicate packages in both dependencies and devDependencies
 - Include file extensions in imports ONLY when the file actually has that extension
 - Components should use .tsx extension, utilities use .ts extension
+- ALWAYS include ALL required dependencies for any packages you use (react-icons, framer-motion, etc.)
+- NEVER use relative imports like '../' - ALWAYS use @/ aliases
 
 **VITE ALIAS CONFIGURATION RULES:**
 - ALWAYS use @/ imports for local files (e.g., '@/components/Header', '@/utils/helper')
@@ -91,11 +97,11 @@ Start with a brief project overview and setup instructions, then provide the com
 - NEVER include next.config.js, tsconfig.node.json, or any Next.js files
 
 **TAILWIND CSS RULES:**
-- ONLY add @tailwind directives if the user explicitly requests Tailwind CSS
-- NEVER add @tailwind directives by default in every project
-- If using Tailwind: include tailwindcss, autoprefixer, postcss in devDependencies
-- If NOT using Tailwind: use regular CSS with basic styles
-- ONLY add className attributes if Tailwind CSS is actually being used
+- ALWAYS add @tailwind directives in src/index.css by default (@tailwind base; @tailwind components; @tailwind utilities;)
+- ALWAYS include tailwindcss, autoprefixer, postcss in devDependencies for every project
+- ALWAYS create tailwind.config.js and postcss.config.js configuration files
+- Use Tailwind CSS classes for all styling and responsive design
+- Only use regular CSS if user explicitly requests no Tailwind CSS
 
 
 **Output format (strict):**
@@ -199,6 +205,12 @@ Start with a brief project overview and setup instructions, then provide the com
     "typescript": "^5.2.2",
     "vite": "^5.2.0"
   }
+
+**IMPORTANT: If using additional packages (react-icons, framer-motion, etc.), add them to dependencies:**
+  - react-icons: "^4.12.0"
+  - framer-motion: "^10.16.0" 
+  - react-intersection-observer: "^9.8.0"
+  - If using Tailwind, add to devDependencies: "tailwindcss": "^3.4.1", "postcss": "^8.4.35", "autoprefixer": "^10.4.17"
 }
 /// endfile
 
@@ -381,17 +393,31 @@ body {
   const writer = writable.getWriter()
   const encoder = new TextEncoder()
 
-  ;(async () => {
+  // Multi-model configuration with fallback
+  const models = [
+    'qwen/qwen3-coder:free',
+    'z-ai/glm-4.5-air:free', 
+    'deepseek/deepseek-chat-v3-0324:free'
+  ]
+
+  const tryModelWithFallback = async (modelIndex = 0): Promise<void> => {
+    if (modelIndex >= models.length) {
+      throw new Error('All models failed. Please try again later.')
+    }
+
+    const currentModel = models[modelIndex]
+    console.log(`Attempting with model: ${currentModel}`)
+
     try {
       // Build messages array with conversation history
       const messages = [
-        { role: 'system', content: systemInstruction },
-        ...conversationHistory.map((msg: any) => ({ role: msg.role, content: msg.content })),
-        { role: 'user', content: prompt }
+        { role: 'system' as const, content: systemInstruction },
+        ...conversationHistory.map((msg: ConversationMessage) => ({ role: msg.role, content: msg.content })),
+        { role: 'user' as const, content: prompt }
       ]
 
       const stream = await openai.chat.completions.create({
-        model: 'qwen/qwen3-coder:free',
+        model: currentModel,
         messages,
         stream: true
       })
@@ -408,9 +434,40 @@ body {
         }
       }
     } catch (error) {
-      console.error('Error in OpenRouter API call:', error)
+      console.error(`Error with model ${currentModel}:`, error)
+      
+      // Check if it's a 429 rate limit error or similar provider error
+      if (error instanceof Error && 
+          (error.message.includes('429') || 
+           error.message.includes('rate limit') ||
+           error.message.includes('quota') ||
+           error.message.includes('provider returned an error'))) {
+        
+        console.log(`Rate limit hit for ${currentModel}, trying next model...`)
+        // Try next model in the fallback chain
+        return tryModelWithFallback(modelIndex + 1)
+      } else {
+        // For other errors, still try fallback but with a warning
+        console.log(`Model ${currentModel} failed with error: ${error instanceof Error ? error.message : 'Unknown error'
+          
+        }. Trying fallback...`)
+        if (modelIndex < models.length - 1) {
+          return tryModelWithFallback(modelIndex + 1)
+        } else {
+          // Last model, propagate the error
+          throw error
+        }
+      }
+    }
+  }
+
+  ;(async () => {
+    try {
+      await tryModelWithFallback()
+    } catch (error) {
+      console.error('All models failed:', error)
       try {
-        await writer.write(encoder.encode(`Error: ${error instanceof Error ? error.message : 'Unknown error'}\n`))
+        await writer.write(encoder.encode(`Error: ${error instanceof Error ? error.message : 'All models are currently unavailable. Please try again later.'}\n`))
       } catch (writeError) {
         // Ignore write errors when client disconnected
       }

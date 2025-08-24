@@ -87,13 +87,31 @@ export const mockGenerateContent = async (input: string): Promise<GeneratedConte
 export const extractPreviewFromHTML = (response: string): string => {
   try {
     // First, try to extract from /// file: preview.html format
-    const previewFileRegex = /\/\/\/ file: preview\.html\s*([\s\S]*?)(?=\/\/\/ endfile|$)/
+    const previewFileRegex = /\/\/\/ file: preview\.html\s*([\s\S]*?)(?=\/\/\/ endfile|\/\/\/ file:|$)/
     const previewMatch = response.match(previewFileRegex)
     
     if (previewMatch && previewMatch[1]) {
-      const htmlContent = previewMatch[1].trim()
+      let htmlContent = previewMatch[1].trim()
+      
+      // Remove any markdown code block markers if present
+      htmlContent = htmlContent.replace(/^```html?\s*/gm, '').replace(/```\s*$/gm, '')
+      
       // Return the complete HTML for iframe rendering
       return htmlContent
+    }
+    
+    // Second, try to find any HTML document in the response
+    const htmlDocRegex = /<!DOCTYPE html>[\s\S]*?<\/html>/i
+    const htmlDocMatch = response.match(htmlDocRegex)
+    if (htmlDocMatch) {
+      return htmlDocMatch[0]
+    }
+    
+    // Third, try to find HTML body content
+    const bodyRegex = /<body[^>]*>([\s\S]*?)<\/body>/i
+    const bodyMatch = response.match(bodyRegex)
+    if (bodyMatch) {
+      return bodyMatch[1]
     }
     
     // Fallback: try to extract from regular HTML content (legacy support)
@@ -117,7 +135,6 @@ export const separateCodeAndText = (response: string): { code: string; descripti
     const fileBlockRegex = /\/\/\/ file: [\s\S]*?(?=\/\/\/ (?:file:|endfile)|$)/g
     
     let cleanedResponse = response
-    let allCode = ''
     
     // Find all file blocks
     const fileBlocks = response.match(fileBlockRegex) || []
@@ -135,22 +152,63 @@ export const separateCodeAndText = (response: string): { code: string; descripti
       }
     })
     
-    // Clean up the description text
+    // If no file blocks found, try to extract code blocks differently
+    if (fileBlocks.length === 0) {
+      // Look for code blocks in markdown format
+      const markdownCodeBlockRegex = /```[\s\S]*?```/g
+      const markdownCodeBlocks = response.match(markdownCodeBlockRegex) || []
+      
+      if (markdownCodeBlocks.length > 0) {
+        markdownCodeBlocks.forEach(block => {
+          cleanedResponse = cleanedResponse.replace(block, '')
+        })
+        
+        const code = markdownCodeBlocks.join('\n\n').replace(/```[\w]*\n?/g, '').replace(/```/g, '').trim()
+        const description = cleanedResponse.replace(/\n\s*\n\s*\n/g, '\n\n').trim()
+        
+        return { code, description }
+      }
+    }
+    
+    // Clean up the description text - keep it more natural
     const description = cleanedResponse
       .replace(/\/\/\/ endfile/g, '')
-      .replace(/^\s*[\r\n]/gm, '') // Remove empty lines
-      .replace(/\*\*(.*?)\*\*/g, '$1') // Remove markdown bold formatting
-      .replace(/- /g, '• ') // Replace dashes with bullets
-      .replace(/(?:\r\n|\r|\n)/g, '\n') // Normalize line endings
-      .replace(/\n\s*\n\s*\n/g, '\n\n') // Replace multiple newlines with double newlines
+      .replace(/\n\s*\n\s*\n+/g, '\n\n') // Normalize excessive line breaks
       .trim()
     
     // Join all code blocks
     const code = codeBlocks.join('\n\n').trim()
     
-    // If no code blocks found, return the full response as code (fallback)
+    // If no code blocks found, try to intelligently split
+    if (!code && response.length > 100) {
+      // Look for common patterns that indicate start of code
+      const codeStartPatterns = [
+        /<!DOCTYPE html>/i,
+        /\/\/\/ file:/i,
+        /import\s+/,
+        /function\s+/,
+        /const\s+\w+\s*=/,
+        /let\s+\w+\s*=/,
+        /var\s+\w+\s*=/,
+        /<[a-zA-Z]/,
+        /{\s*$/m
+      ]
+      
+      for (const pattern of codeStartPatterns) {
+        const match = response.match(pattern)
+        if (match && match.index && match.index > 50) { // Ensure some description text exists
+          const splitPoint = match.index
+          return {
+            code: response.slice(splitPoint).trim(),
+            description: response.slice(0, splitPoint).trim()
+          }
+        }
+      }
+    }
+    
+    // Final fallback - return as-is but prioritize description
     return {
-      code: code || response,
+      code: code || (response.length > 500 ? response : ''),
       description: description || response
     }
   } catch (error) {

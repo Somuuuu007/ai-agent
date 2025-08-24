@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { promises as fs } from 'fs'
 import path from 'path'
+import { fixProject } from '@/libs/projectFixer'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -49,37 +50,47 @@ export async function POST(req: NextRequest) {
 }
 
 async function validateAndFixProject(projectPath: string): Promise<ValidationResult> {
+  // Use our robust ProjectFixer
+  const projectId = path.basename(projectPath)
+  const fixResult = await fixProject(projectPath, projectId)
+  
   const result: ValidationResult = {
-    isValid: true,
-    errors: [],
-    warnings: [],
-    fixes: [],
-    fixedFiles: []
+    isValid: fixResult.success,
+    errors: fixResult.errors,
+    warnings: [], // Our fixer doesn't generate warnings currently
+    fixes: fixResult.fixes,
+    fixedFiles: fixResult.fixedFiles
   }
 
-  // 1. Validate and fix package.json
-  await validatePackageJson(projectPath, result)
-
-  // 2. Validate and fix file imports/dependencies
-  await validateFileImports(projectPath, result)
-
-  // 3. Validate and fix client components
-  await validateClientComponents(projectPath, result)
-
-  // 4. Validate and fix config files
-  await validateConfigFiles(projectPath, result)
-
-  // 5. Remove conflicting framework files
-  await removeConflictingFiles(projectPath, result)
-
-  // 6. Validate file path consistency
-  await validateFilePaths(projectPath, result)
+  // Additional legacy validations for backwards compatibility
+  await validateAdditionalIssues(projectPath, result)
 
   result.isValid = result.errors.length === 0
 
   return result
 }
 
+async function validateAdditionalIssues(projectPath: string, result: ValidationResult) {
+  // Additional validation checks can be added here in the future
+  // For now, our ProjectFixer handles most common issues
+  try {
+    // Check if essential files exist
+    const essentialFiles = ['package.json', 'src/main.tsx', 'index.html', 'vite.config.ts']
+    
+    for (const file of essentialFiles) {
+      const filePath = path.join(projectPath, file)
+      try {
+        await fs.access(filePath)
+      } catch {
+        result.warnings.push(`Missing essential file: ${file}`)
+      }
+    }
+  } catch (error) {
+    result.errors.push(`Additional validation failed: ${error instanceof Error ? error.message : 'Unknown error'}`)
+  }
+}
+
+// Legacy validation function - keeping for backwards compatibility but simplified
 async function validatePackageJson(projectPath: string, result: ValidationResult) {
   const packageJsonPath = path.join(projectPath, 'package.json')
   
