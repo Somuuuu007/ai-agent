@@ -9,6 +9,7 @@ import { useAIAgent } from '@/hooks/useAIAgent'
 import { useEffect, useRef, useState } from 'react'
 import gsap from 'gsap'
 
+
 export default function AIAgentPage() {
   const {
     input,
@@ -23,7 +24,12 @@ export default function AIAgentPage() {
     lastPrompt,
     conversationHistory,
     livePreviewUrl,
-    projectId
+    projectId,
+    viewPreviousResponse,
+    viewCurrentResponse,
+    getDisplayContent,
+    viewingPreviousResponse,
+    responseHistory
   } = useAIAgent()
 
   const [showOutput, setShowOutput] = useState(false)
@@ -152,17 +158,40 @@ export default function AIAgentPage() {
               <div className="flex-1 overflow-y-auto pl-4 pr-0 pb-4 scrollbar-thin">
                 <div className="space-y-8 max-w-3xl mx-auto w-full">
                   {/* Display conversation history */}
-                  {conversationHistory.map((message, index) => (
-                    <div key={index} className={`flex ${message.role === 'user' ? 'justify-end pr-1' : 'justify-start pl-1'}`}>
-                      {message.role === 'user' ? (
-                        <div className="max-w-lg bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl p-4 text-white text-sm shadow-[inset_0_1px_0_0_rgba(255,255,255,0.06)]">
-                          {message.content}
+                  {conversationHistory.map((message, index) => {
+                    const isAssistant = message.role === 'assistant'
+                    const hasGeneratedContent = isAssistant && message.generatedContent
+                    const responseIndex = isAssistant ? Math.floor(index / 2) : -1 // Calculate response index for assistant messages
+                    
+                    return (
+                      <div key={index}>
+                        <div className={`flex ${message.role === 'user' ? 'justify-end pr-1' : 'justify-start pl-1'}`}>
+                          {message.role === 'user' ? (
+                            <div className="max-w-lg bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl p-4 text-white text-sm shadow-[inset_0_1px_0_0_rgba(255,255,255,0.06)]">
+                              {message.content}
+                            </div>
+                          ) : (
+                            <FormattedResponse content={message.content} />
+                          )}
                         </div>
-                      ) : (
-                        <FormattedResponse content={message.content} />
-                      )}
-                    </div>
-                  ))}
+                        
+                        {/* Add "View Previous Response" button after each assistant message with generated content, but only from the 2nd response onwards */}
+                        {hasGeneratedContent && responseIndex >= 0 && responseIndex > 0 && (
+                          <div className="flex justify-start pl-2 mt-2 space-x-3">
+                            <button
+                              onClick={() => {
+                                viewPreviousResponse(responseIndex)
+                                setShowOutput(true)
+                              }}
+                              className="px-3 py-1.5 bg-purple-600/20 hover:bg-purple-600/30 border border-purple-500/30 hover:border-purple-500/50 rounded-lg text-purple-300 hover:text-purple-200 text-xs font-medium transition-all hover:transform hover:-translate-y-0.5"
+                            >
+                              View Previous Response
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })}
                   
                   {/* Loading state - show current request and loading */}
                   {isLoading && lastPrompt && !conversationHistory.some(msg => msg.content === lastPrompt) && (
@@ -174,9 +203,11 @@ export default function AIAgentPage() {
                       </div>
                       <div className="flex justify-start pl-1">
                         <div className="max-w-3xl text-gray-200 text-sm">
-                          <div className="inline-flex items-center">
-                            <Loader2 className="h-3.5 w-3.5 animate-spin mr-2" />
-                            Generating output...
+                          <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl p-4">
+                            <div className="flex items-center">
+                              <Loader2 className="h-4 w-4 animate-spin mr-2 text-purple-400" />
+                              <span className="text-white">Generating output...</span>
+                            </div>
                           </div>
                         </div>
                       </div>
@@ -197,7 +228,7 @@ export default function AIAgentPage() {
                     </>
                   )}
                   
-                  {generatedContent && (
+                  {(generatedContent || viewingPreviousResponse !== null) && (
                     <div className="flex justify-start pl-2 space-x-3">
                       <button
                         onClick={() => setShowOutput(v => !v)}
@@ -205,14 +236,20 @@ export default function AIAgentPage() {
                       >
                         {showOutput ? 'Hide output' : 'Show output'}
                       </button>
-                      {projectId && (
+                      
+                      {/* Show "Back to Current" button when viewing previous response */}
+                      {viewingPreviousResponse !== null && (
                         <button
-                          onClick={() => handleLivePreview()}
-                          className="px-4 py-2 bg-blue-600/20 hover:bg-blue-600/30 border border-blue-500/30 hover:border-blue-500/50 rounded-lg text-blue-300 hover:text-blue-200 text-xs font-medium transition-all hover:transform hover:-translate-y-0.5"
+                          onClick={() => {
+                            viewCurrentResponse()
+                            setShowOutput(true)
+                          }}
+                          className="px-4 py-2 bg-green-600/20 hover:bg-green-600/30 border border-green-500/30 hover:border-green-500/50 rounded-lg text-green-300 hover:text-green-200 text-xs font-medium transition-all hover:transform hover:-translate-y-0.5"
                         >
-                          Show Live Preview
+                          Back to Current
                         </button>
                       )}
+                      
                     </div>
                   )}
                 </div>
@@ -237,53 +274,61 @@ export default function AIAgentPage() {
         </div>
 
         <div ref={rightRef} className="opacity-0 min-w-0 flex flex-col h-[calc(100vh-2rem)] overflow-hidden relative z-10">
-          {generatedContent && (
+          {getDisplayContent() && (
             <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl overflow-hidden shadow-[0_10px_40px_rgba(0,0,0,0.5)] w-full h-full flex flex-col">
-              <div className="p-3 border-b border-white/10 flex items-center space-x-2 flex-shrink-0">
-                <button
-                  onClick={() => setActiveTab('preview')}
-                  className={`flex items-center px-3 py-1 rounded-lg text-xs transition-all ${
-                    activeTab === 'preview' 
-                      ? 'bg-white/15 text-white border border-white/20' 
-                      : 'bg-white/5 text-white/60 hover:text-white/80 border border-white/5 hover:border-white/15'
-                  }`}
-                >
-                  <Eye className="h-3.5 w-3.5 mr-2" />
-                  Preview
-                </button>
-                <button
-                  onClick={() => setActiveTab('code')}
-                  className={`flex items-center px-3 py-1 rounded-lg text-xs transition-all ${
-                    activeTab === 'code' 
-                      ? 'bg-white/15 text-white border border-white/20' 
-                      : 'bg-white/5 text-white/60 hover:text-white/80 border border-white/5 hover:border-white/15'
-                  }`}
-                >
-                  <Code className="h-3.5 w-3.5 mr-2" />
-                  Code
-                </button>
+              <div className="p-3 border-b border-white/10 flex items-center justify-between flex-shrink-0">
+                <div className="flex items-center space-x-2">
+                  <button
+                    onClick={() => setActiveTab('preview')}
+                    className={`flex items-center px-3 py-1 rounded-lg text-xs transition-all ${
+                      activeTab === 'preview' 
+                        ? 'bg-white/15 text-white border border-white/20' 
+                        : 'bg-white/5 text-white/60 hover:text-white/80 border border-white/5 hover:border-white/15'
+                    }`}
+                  >
+                    <Eye className="h-3.5 w-3.5 mr-2" />
+                    Preview
+                  </button>
+                  <button
+                    onClick={() => setActiveTab('code')}
+                    className={`flex items-center px-3 py-1 rounded-lg text-xs transition-all ${
+                      activeTab === 'code' 
+                        ? 'bg-white/15 text-white border border-white/20' 
+                        : 'bg-white/5 text-white/60 hover:text-white/80 border border-white/5 hover:border-white/15'
+                    }`}
+                  >
+                    <Code className="h-3.5 w-3.5 mr-2" />
+                    Code
+                  </button>
+                </div>
+                
+                {/* Show indicator when viewing previous response */}
+                {viewingPreviousResponse !== null && (
+                  <div className="text-xs text-purple-300 bg-purple-600/20 px-2 py-1 rounded border border-purple-500/30">
+                    Viewing Response #{viewingPreviousResponse + 1}
+                  </div>
+                )}
               </div>
               <div className="flex-1 overflow-hidden ">
                 {activeTab === 'preview' ? (
                   <div className="h-full overflow-y-auto p-6 scrollbar-thin">
                     <div className="space-y-4">
-                      {generatedContent?.preview ? (
+                      {(() => {
+                        const displayContent = getDisplayContent();
+                        return displayContent?.preview ? (
                         <>
                           <div className="flex items-center justify-between p-3 bg-white/5 border border-white/10 rounded-lg w-[114vh]">
                             <div className="flex items-center space-x-2 ">
                               <div className="w-2 h-2 bg-blue-400 rounded-full"></div>
                               <span className="text-white text-sm font-medium">Static Preview</span>
                             </div>
-                            {projectId && (
-                              <span className="text-blue-300 text-sm">Live preview available via button</span>
-                            )}
                           </div>
-                          {generatedContent.preview.trim().length > 0 ? (
+                          {displayContent.preview && displayContent.preview.trim().length > 0 ? (
                             <>
-                              {generatedContent.preview.includes('<!DOCTYPE html>') || generatedContent.preview.includes('<html') ? (
+                              {displayContent.preview?.includes('<!DOCTYPE html>') || displayContent.preview?.includes('<html') ? (
                                 // Complete HTML document - use iframe
                                 <iframe
-                                  srcDoc={generatedContent.preview}
+                                  srcDoc={displayContent.preview}
                                   className="w-[114vh] h-[73vh] border border-white/20 rounded-lg bg-white"
                                   title="Static Preview"
                                   sandbox="allow-scripts allow-same-origin allow-forms"
@@ -300,7 +345,7 @@ export default function AIAgentPage() {
                                       <script src="https://cdn.tailwindcss.com"></script>
                                       <style>body { padding: 1rem; }</style>
                                     </head>
-                                    <body>${generatedContent.preview}</body>
+                                    <body>${displayContent.preview || ''}</body>
                                     </html>`}
                                   className="w-full h-[60vh] border border-white/20 rounded-lg bg-white"
                                   title="Static Preview"
@@ -317,31 +362,20 @@ export default function AIAgentPage() {
                         </>
                       ) : (
                         <div className="text-white/60 text-center py-8 bg-white/5 border border-white/10 rounded-lg">No preview available</div>
-                      )}
+                      ); })()}
                     </div>
                   </div>
                 ) : (
                   <div className="h-full overflow-y-auto scrollbar-thin">
                     <div className="p-6">
-                      {generatedContent?.code ? (
+                      {getDisplayContent()?.code ? (
                         <div className="bg-white/5 border border-white/10 rounded-lg overflow-hidden">
-                          <div className="px-4 py-3 bg-white/5 border-b border-white/10 flex items-center justify-between">
+                          <div className="px-4 py-3 bg-white/5 border-b border-white/10">
                             <span className="text-white text-sm font-medium">Generated Code</span>
-                            <button
-                              onClick={() => copyToClipboard()}
-                              className="text-white/60 hover:text-white transition-colors"
-                              title="Copy code"
-                            >
-                              {copiedCode ? (
-                                <Check className="h-4 w-4" />
-                              ) : (
-                                <Copy className="h-4 w-4" />
-                              )}
-                            </button>
                           </div>
                           <div className="p-4 overflow-x-auto">
                             <pre className="text-sm text-gray-300 whitespace-pre-wrap">
-                              <code>{generatedContent.code}</code>
+                              <code>{getDisplayContent()?.code}</code>
                             </pre>
                           </div>
                         </div>

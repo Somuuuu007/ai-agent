@@ -8,6 +8,7 @@ export interface GeneratedContent {
     role: 'user' | 'assistant'
     content: string
     timestamp: number
+    generatedContent?: GeneratedContent // Store full response data for assistant messages
   }
   
   export interface AIAgentState {
@@ -19,17 +20,9 @@ export interface GeneratedContent {
     lastPrompt: string
     conversationHistory: ConversationMessage[]
     isFirstRequest: boolean
-    livePreviewUrl?: string
-    projectId?: string
+    viewingPreviousResponse: number | null // Index of previous response being viewed
+    responseHistory: GeneratedContent[] // Store all previous complete responses
+    projectId: string | null // For live preview functionality
+    livePreviewUrl: string | null // Live preview URL when available
   }
 
-  export interface ExtractedFile {
-    path: string
-    content: string
-  }
-
-  export interface LivePreviewData {
-    port: number
-    previewUrl: string
-    status: string
-  }

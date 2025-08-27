@@ -1,11 +1,11 @@
 import { type ClassValue, clsx } from "clsx"
 import { twMerge } from "tailwind-merge"
-import { GeneratedContent, ExtractedFile } from "@/types"
+import { GeneratedContent} from "@/types"
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
-export const mockGenerateContent = async (input: string): Promise<GeneratedContent> => {
+export const mockGenerateContent = async (_input: string): Promise<GeneratedContent> => {
   // Simulate API delay
   await new Promise(resolve => setTimeout(resolve, 2000))
   
@@ -86,43 +86,56 @@ export const mockGenerateContent = async (input: string): Promise<GeneratedConte
 
 export const extractPreviewFromHTML = (response: string): string => {
   try {
-    // First, try to extract from /// file: preview.html format
-    const previewFileRegex = /\/\/\/ file: preview\.html\s*([\s\S]*?)(?=\/\/\/ endfile|\/\/\/ file:|$)/
+    // First, try to extract from /// file: preview.html format with precise boundaries
+    const previewFileRegex = /\/\/\/ file: preview\.html\s*\n([\s\S]*?)(?=\n\/\/\/ (?:endfile|file:)|$)/
     const previewMatch = response.match(previewFileRegex)
     
     if (previewMatch && previewMatch[1]) {
       let htmlContent = previewMatch[1].trim()
       
-      // Remove any markdown code block markers if present
+      // Remove any markdown code block markers
       htmlContent = htmlContent.replace(/^```html?\s*/gm, '').replace(/```\s*$/gm, '')
       
-      // Return the complete HTML for iframe rendering
-      return htmlContent
+      // Look for the actual HTML document start
+      const docTypeIndex = htmlContent.indexOf('<!DOCTYPE html>')
+      if (docTypeIndex >= 0) {
+        // Extract from DOCTYPE to end of HTML
+        htmlContent = htmlContent.substring(docTypeIndex)
+        
+        // Find the end of the HTML document
+        const htmlEndIndex = htmlContent.lastIndexOf('</html>')
+        if (htmlEndIndex > 0) {
+          htmlContent = htmlContent.substring(0, htmlEndIndex + 7)
+        }
+        
+        // Validate this is actually HTML and not mixed with text
+        if (htmlContent.includes('<!DOCTYPE html>') && 
+            htmlContent.includes('<html') && 
+            htmlContent.includes('<body') &&
+            htmlContent.includes('</body>') &&
+            htmlContent.includes('</html>')) {
+          return htmlContent
+        }
+      }
     }
     
-    // Second, try to find any HTML document in the response
+    // Fallback: Look for complete HTML document anywhere in response
     const htmlDocRegex = /<!DOCTYPE html>[\s\S]*?<\/html>/i
-    const htmlDocMatch = response.match(htmlDocRegex)
-    if (htmlDocMatch) {
-      return htmlDocMatch[0]
+    const htmlMatches = response.match(htmlDocRegex)
+    if (htmlMatches) {
+      let htmlContent = htmlMatches[0]
+      
+      // Validate it's a complete HTML document
+      if (htmlContent.includes('<body') && 
+          htmlContent.includes('</body>') && 
+          htmlContent.includes('<html') && 
+          htmlContent.includes('</html>')) {
+        return htmlContent
+      }
     }
     
-    // Third, try to find HTML body content
-    const bodyRegex = /<body[^>]*>([\s\S]*?)<\/body>/i
-    const bodyMatch = response.match(bodyRegex)
-    if (bodyMatch) {
-      return bodyMatch[1]
-    }
-    
-    // Fallback: try to extract from regular HTML content (legacy support)
-    const bodyStart = response.indexOf('<body')
-    if (bodyStart === -1) return ''
-    const openTagEnd = response.indexOf('>', bodyStart)
-    if (openTagEnd === -1) return ''
-    const bodyEnd = response.indexOf('</body>')
-    if (bodyEnd === -1) return response.slice(openTagEnd + 1)
-    const inner = response.slice(openTagEnd + 1, bodyEnd)
-    return inner
+    // If no valid HTML found, return empty string (this prevents showing entire response)
+    return ''
   } catch (error) {
     console.error('Error extracting preview:', error)
     return ''
@@ -131,85 +144,265 @@ export const extractPreviewFromHTML = (response: string): string => {
 
 export const separateCodeAndText = (response: string): { code: string; description: string } => {
   try {
-    // Extract all file blocks (/// file: blocks)
-    const fileBlockRegex = /\/\/\/ file: [\s\S]*?(?=\/\/\/ (?:file:|endfile)|$)/g
-    
-    let cleanedResponse = response
-    
-    // Find all file blocks
-    const fileBlocks = response.match(fileBlockRegex) || []
-    
-    // Separate code blocks (excluding preview.html) from description text
-    const codeBlocks: string[] = []
-    
-    fileBlocks.forEach(block => {
-      // Remove all file blocks from description
-      cleanedResponse = cleanedResponse.replace(block, '')
-      
-      // Add non-preview file blocks to code
-      if (!block.includes('/// file: preview.html')) {
-        codeBlocks.push(block)
-      }
-    })
-    
-    // If no file blocks found, try to extract code blocks differently
-    if (fileBlocks.length === 0) {
-      // Look for code blocks in markdown format
-      const markdownCodeBlockRegex = /```[\s\S]*?```/g
-      const markdownCodeBlocks = response.match(markdownCodeBlockRegex) || []
-      
-      if (markdownCodeBlocks.length > 0) {
-        markdownCodeBlocks.forEach(block => {
-          cleanedResponse = cleanedResponse.replace(block, '')
-        })
-        
-        const code = markdownCodeBlocks.join('\n\n').replace(/```[\w]*\n?/g, '').replace(/```/g, '').trim()
-        const description = cleanedResponse.replace(/\n\s*\n\s*\n/g, '\n\n').trim()
-        
-        return { code, description }
-      }
+    // Normalize the response first
+    const normalizedResponse = response.trim()
+    if (!normalizedResponse) {
+      return { code: '', description: '' }
     }
     
-    // Clean up the description text - keep it more natural
-    const description = cleanedResponse
-      .replace(/\/\/\/ endfile/g, '')
-      .replace(/\n\s*\n\s*\n+/g, '\n\n') // Normalize excessive line breaks
-      .trim()
+    // Quick extraction for streaming - get any file blocks immediately
+    const quickCodeRegex = /\/\/\/ file: (?!preview\.html)[^\n]*[\s\S]*?(?=\/\/\/ file:|$)/g
+    const quickCodeMatches = normalizedResponse.match(quickCodeRegex) || []
     
-    // Join all code blocks
-    const code = codeBlocks.join('\n\n').trim()
-    
-    // If no code blocks found, try to intelligently split
-    if (!code && response.length > 100) {
-      // Look for common patterns that indicate start of code
-      const codeStartPatterns = [
-        /<!DOCTYPE html>/i,
-        /\/\/\/ file:/i,
-        /import\s+/,
-        /function\s+/,
-        /const\s+\w+\s*=/,
-        /let\s+\w+\s*=/,
-        /var\s+\w+\s*=/,
-        /<[a-zA-Z]/,
-        /{\s*$/m
-      ]
+    // If we have any non-preview files, extract them immediately for streaming
+    if (quickCodeMatches.length > 0) {
+      const quickCode = quickCodeMatches.join('\n\n').trim()
+      let quickDescription = normalizedResponse
+        .replace(/\/\/\/ file: preview\.html[\s\S]*?(?=\/\/\/ file:|$)/, '') // Remove preview
+        .replace(/\/\/\/ file: (?!preview\.html)[\s\S]*?(?=\/\/\/ file:|$)/g, '') // Remove code files
+        .trim()
       
-      for (const pattern of codeStartPatterns) {
-        const match = response.match(pattern)
-        if (match && match.index && match.index > 50) { // Ensure some description text exists
-          const splitPoint = match.index
-          return {
-            code: response.slice(splitPoint).trim(),
-            description: response.slice(0, splitPoint).trim()
-          }
+      // Ensure we always have some description
+      if (!quickDescription && quickCode.length > 50) {
+        quickDescription = 'Generated project files ready!'
+      }
+      
+      if (quickCode && quickCode.length > 50) { // Only return if substantial
+        return {
+          code: quickCode,
+          description: quickDescription || 'Generating your project...'
         }
       }
     }
     
-    // Final fallback - return as-is but prioritize description
+    // Check if this looks like a follow-up response (minimal content, mostly just file updates)
+    const isLikelyFollowUp = normalizedResponse.includes('/// file:') && 
+                            !normalizedResponse.toLowerCase().includes('project overview') &&
+                            !normalizedResponse.toLowerCase().includes('setup instructions') &&
+                            !normalizedResponse.toLowerCase().includes('project structure') &&
+                            (normalizedResponse.split('\n').length < 50 || // Follow-ups are typically much shorter
+                             (!normalizedResponse.toLowerCase().includes('vite') && !normalizedResponse.toLowerCase().includes('package.json')))
+    
+    // For follow-up responses, handle them differently
+    if (isLikelyFollowUp) {
+      // Extract preview immediately 
+      const preview = extractPreviewFromHTML(response)
+      
+      // Get all file blocks
+      const allFileBlocks = response.match(/\/\/\/ file: [^\n]+[\s\S]*?(?=\/\/\/ (?:file:|endfile)|$)/g) || []
+      const codeFileBlocks = allFileBlocks.filter(block => !block.includes('/// file: preview.html'))
+      
+      // For follow-ups, description is minimal - just mention what was updated
+      const updatedFiles: string[] = []
+      codeFileBlocks.forEach(block => {
+        const fileNameMatch = block.match(/\/\/\/ file: ([^\n]+)/)
+        if (fileNameMatch) {
+          updatedFiles.push(fileNameMatch[1])
+        }
+      })
+      
+      const description = updatedFiles.length > 0 
+        ? `Updated files: ${updatedFiles.join(', ')}`
+        : 'Files updated successfully'
+        
+      return {
+        code: codeFileBlocks.join('\n\n').trim(),
+        description
+      }
+    }
+    
+    // Original logic for first-time requests
+    // Since preview.html now comes first, we need to handle the structure differently
+    // Look for the pattern: preview.html -> description -> code files
+    
+    let cleanedResponse = response
+    let descriptionText = ''
+    let projectStructureSection = ''
+    
+    // First, remove the preview.html block entirely (it shouldn't be in description or code)
+    const previewBlockRegex = /\/\/\/ file: preview\.html[\s\S]*?(?=\n\/\/\/ (?:endfile|file:)|$)/
+    cleanedResponse = cleanedResponse.replace(previewBlockRegex, '')
+    cleanedResponse = cleanedResponse.replace(/\/\/\/ endfile/g, '')
+    
+    // Extract Project Structure section before processing code blocks
+    const projectStructureRegex = /(?:^|\n)(?:\*\*)?(?:project structure|then project overview|project structure)(?:\*\*)?[:\s]*\n([\s\S]*?)(?=\n(?:\*\*)?(?:setup instructions|getting started|installation|usage|dependencies|tech stack|features|components|configuration|api|examples|scripts|summary|conclusion|overview about|\/\/\/ file:|$))/i
+    const structureMatch = cleanedResponse.match(projectStructureRegex)
+    
+    if (structureMatch && structureMatch[1]) {
+      projectStructureSection = `**Project Structure:**\n${structureMatch[1].trim()}`
+      // Remove the structure section from cleanedResponse so it doesn't appear in description
+      cleanedResponse = cleanedResponse.replace(structureMatch[0], '')
+    }
+    
+    // Extract all remaining file blocks (these are the actual code files)
+    // Only match blocks that are NOT preview.html and look like actual files
+    const codeFileRegex = /\/\/\/ file: (?!preview\.html)[^\n]+\.(tsx?|jsx?|css|html|json|js|ts|py|go|rs|java|cpp|c)[\s\S]*?(?=\n\/\/\/ (?:file:|endfile)|$)/g
+    let codeFileBlocks: RegExpMatchArray | string[] = cleanedResponse.match(codeFileRegex) || []
+    
+    // If no specific file extension matches, try broader pattern but with validation
+    if (codeFileBlocks.length === 0) {
+      const broadCodeRegex = /\/\/\/ file: (?!preview\.html)[^\n]+[\s\S]*?(?=\n\/\/\/ (?:file:|endfile)|$)/g
+      const potentialBlocks = cleanedResponse.match(broadCodeRegex) || []
+      
+      // Filter to only include blocks that look like actual code files
+      codeFileBlocks = potentialBlocks.filter((block: string) => {
+        const fileNameMatch = block.match(/\/\/\/ file: ([^\n]+)/)
+        if (!fileNameMatch) return false
+        
+        const fileName = fileNameMatch[1].trim()
+        // Include if it has a file extension OR contains typical file patterns
+        return fileName.includes('.') || 
+               fileName.includes('/') && !fileName.toLowerCase().includes('overview') &&
+               !fileName.toLowerCase().includes('description') &&
+               !fileName.toLowerCase().includes('structure')
+      })
+    }
+    
+    // Remove code file blocks from the cleaned response to get description
+    let descriptionOnly = cleanedResponse
+    codeFileBlocks.forEach(block => {
+      descriptionOnly = descriptionOnly.replace(block, '')
+    })
+    
+    // Clean up the description text with comprehensive cleanup
+    descriptionText = descriptionOnly
+      .replace(/\/\/\/ endfile/g, '')
+      .replace(/```[a-zA-Z]*\s*$/gm, '') // Remove trailing ``` with language specifiers
+      .replace(/```\s*$/gm, '') // Remove trailing ``` without language specifiers
+      .replace(/^```[a-zA-Z]*\s*\n?/gm, '') // Remove starting ``` with language specifiers
+      .replace(/^```\s*\n?/gm, '') // Remove starting ``` without language specifiers
+      .replace(/```[a-zA-Z]*\s*/g, '') // Remove any remaining ``` with language in middle
+      .replace(/```/g, '') // Remove any remaining standalone ```
+      .replace(/\n\s*\n\s*\n+/g, '\n\n') // Normalize excessive line breaks
+      .trim()
+    
+    // Clean up code blocks by removing unwanted markdown markers
+    const cleanedCodeBlocks = codeFileBlocks.map((block: string) => {
+      return block
+        .replace(/```[a-zA-Z]*\s*$/gm, '') // Remove trailing ``` markers with language specifiers
+        .replace(/```\s*$/gm, '') // Remove trailing ``` markers without language specifiers
+        .replace(/^```[a-zA-Z]*\s*\n/gm, '') // Remove starting ``` markers
+        .trim()
+    })
+    
+    // Join all code blocks (excluding preview.html)
+    let code = cleanedCodeBlocks.join('\n\n').trim()
+    
+    // Prepend project structure section to code if it exists
+    if (projectStructureSection) {
+      code = projectStructureSection + (code ? '\n\n' + code : '')
+    }
+    
+    // If we have no description text and no code, most likely this is just descriptive text
+    // Don't try to extract code from purely descriptive responses
+    if (!descriptionText && !code && response.length > 0) {
+      // Only try markdown fallback if there are actual code blocks that look like code
+      const markdownCodeBlockRegex = /```[\w]*\n[\s\S]*?```/g
+      const markdownCodeBlocks = response.match(markdownCodeBlockRegex) || []
+      
+      // Validate that these are actual code blocks, not just formatted text
+      const validCodeBlocks = markdownCodeBlocks.filter(block => {
+        const content = block.replace(/```[\w]*\n?/g, '').replace(/```/g, '')
+        // Check if it contains code-like patterns
+        return content.includes('import ') || content.includes('function ') || 
+               content.includes('const ') || content.includes('export ') ||
+               content.includes('<') && content.includes('>') ||
+               content.includes('{') && content.includes('}') && content.split('\n').length > 2
+      })
+      
+      if (validCodeBlocks.length > 0) {
+        let fallbackCleaned = response
+        validCodeBlocks.forEach(block => {
+          fallbackCleaned = fallbackCleaned.replace(block, '')
+        })
+        
+        // Remove preview.html from fallback as well
+        fallbackCleaned = fallbackCleaned.replace(previewBlockRegex, '')
+        
+        let fallbackCode = validCodeBlocks.join('\n\n')
+          .replace(/```[a-zA-Z]*\s*$/gm, '') // Remove trailing ``` with language
+          .replace(/```\s*$/gm, '') // Remove trailing ```
+          .replace(/^```[a-zA-Z]*\s*\n/gm, '') // Remove starting ``` with language
+          .replace(/^```\s*\n/gm, '') // Remove starting ```
+          .replace(/```/g, '') // Remove any remaining ```
+          .trim()
+        const fallbackDescription = fallbackCleaned.replace(/\n\s*\n\s*\n/g, '\n\n').trim()
+        
+        // Prepend project structure section to fallback code if it exists
+        if (projectStructureSection) {
+          fallbackCode = projectStructureSection + (fallbackCode ? '\n\n' + fallbackCode : '')
+        }
+        
+        return { code: fallbackCode, description: fallbackDescription }
+      }
+    }
+    
+    // Only try intelligent split if we actually have code patterns AND file blocks
+    if (!code && codeFileBlocks.length === 0 && response.includes('/// file:')) {
+      // Look for common patterns that indicate start of actual code files
+      const codeFilePattern = /\/\/\/ file: (?!preview\.html)/
+      const match = response.match(codeFilePattern)
+      
+      if (match && match.index && match.index > 50) {
+        const splitPoint = match.index
+        let intelligentCode = response.slice(splitPoint).trim()
+        
+        // Prepend project structure section to intelligent split code if it exists
+        if (projectStructureSection) {
+          intelligentCode = projectStructureSection + (intelligentCode ? '\n\n' + intelligentCode : '')
+        }
+        
+        return {
+          code: intelligentCode,
+          description: response.slice(0, splitPoint).trim()
+        }
+      }
+    }
+    
+    // Return the separated content
+    // If we have no description but the original response has content, use it
+    if (!descriptionText && normalizedResponse.length > 0 && !code) {
+      // Clean the response by removing only preview.html blocks
+      descriptionText = normalizedResponse
+        .replace(previewBlockRegex, '')
+        .replace(/\/\/\/ endfile/g, '')
+        .replace(/```[a-zA-Z]*\s*$/gm, '') // Remove trailing ``` with language specifiers
+        .replace(/```\s*$/gm, '') // Remove trailing ``` without language specifiers
+        .replace(/^```[a-zA-Z]*\s*\n?/gm, '') // Remove starting ``` with language specifiers
+        .replace(/^```\s*\n?/gm, '') // Remove starting ``` without language specifiers
+        .replace(/```[a-zA-Z]*\s*/g, '') // Remove any remaining ``` with language in middle
+        .replace(/```/g, '') // Remove any remaining standalone ```
+        .replace(/\n\s*\n\s*\n+/g, '\n\n')
+        .trim()
+    }
+    
+    // Final fallback - ensure we always return meaningful content but never the entire response
+    if (!code && !descriptionText && normalizedResponse.length > 0) {
+      // If nothing else worked, extract only descriptive text (not file content)
+      descriptionText = normalizedResponse
+        .replace(/\/\/\/ file: [\s\S]*?(?=\n\/\/\/ (?:file:|endfile)|$)/g, '')
+        .replace(/\/\/\/ endfile/g, '')
+        .replace(/```[\s\S]*?```/g, '') // Remove markdown code blocks
+        .replace(/```[a-zA-Z]*\s*$/gm, '') // Remove trailing ``` with language specifiers
+        .replace(/```\s*$/gm, '') // Remove trailing ``` without language specifiers
+        .replace(/^```[a-zA-Z]*\s*\n?/gm, '') // Remove starting ``` with language specifiers
+        .replace(/^```\s*\n?/gm, '') // Remove starting ``` without language specifiers
+        .replace(/```[a-zA-Z]*\s*/g, '') // Remove any remaining ``` with language in middle
+        .replace(/```/g, '') // Remove any remaining standalone ```
+        .replace(/<!DOCTYPE html>[\s\S]*?<\/html>/gi, '') // Remove any HTML content
+        .replace(/\n\s*\n\s*\n+/g, '\n\n')
+        .trim()
+      
+      // If the cleaned text is too long (likely contains unwanted content), truncate it
+      if (descriptionText.length > 2000) {
+        const sentences = descriptionText.split(/[.!?]\s+/)
+        descriptionText = sentences.slice(0, 5).join('. ') + (sentences.length > 5 ? '.' : '')
+      }
+    }
+    
     return {
-      code: code || (response.length > 500 ? response : ''),
-      description: description || response
+      code: code || '',
+      description: descriptionText || 'Content generated successfully!'
     }
   } catch (error) {
     console.error('Error separating code and text:', error)
@@ -220,109 +413,4 @@ export const separateCodeAndText = (response: string): { code: string; descripti
   }
 }
 
-export const extractFilesFromResponse = (response: string): ExtractedFile[] => {
-  try {
-    const files: ExtractedFile[] = []
-    
-    // Split response by /// file: markers to handle them individually
-    const fileSections = response.split(/\/\/\/ file: /)
-    
-    // Skip the first section (everything before the first /// file:)
-    for (let i = 1; i < fileSections.length; i++) {
-      const section = fileSections[i]
-      
-      // Find the end of the filename (first newline)
-      const firstNewlineIndex = section.indexOf('\n')
-      if (firstNewlineIndex === -1) continue
-      
-      const filePath = section.substring(0, firstNewlineIndex).trim()
-      let content = section.substring(firstNewlineIndex + 1)
-      
-      // Skip preview.html files as they're handled separately
-      if (filePath === 'preview.html') {
-        continue
-      }
-      
-      // Clean up content by removing /// endfile if present
-      content = content.replace(/\/\/\/ endfile[\s\S]*$/, '').trim()
-      
-      // Remove markdown code block markers (more comprehensive)
-      // Remove opening markers: ```json, ```tsx, ```js, etc.
-      content = content.replace(/^```\w*\s*/g, '').trim()
-      
-      // Remove closing markers: ``` at end
-      content = content.replace(/\s*```\s*$/g, '').trim()
-      
-      // Remove any remaining standalone ``` lines
-      content = content.replace(/^\s*```\s*$/gm, '').trim()
-      
-      if (filePath && content) {
-        files.push({
-          path: filePath,
-          content: content
-        })
-      }
-    }
-    
-    return files
-  } catch (error) {
-    console.error('Error extracting files from response:', error)
-    return []
-  }
-}
 
-export const generateProjectId = (): string => {
-  return `proj-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
-}
-
-export interface SaveProjectResponse {
-  success: boolean
-  projectId: string
-  savedFiles: number
-  projectPath: string
-  livePreview?: {
-    port: number
-    previewUrl: string
-    status: string
-  } | null
-  instructions: string
-}
-
-export const saveProjectFiles = async (projectId: string, files: ExtractedFile[]): Promise<SaveProjectResponse | null> => {
-  try {
-    const response = await fetch('/api/save-project', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        projectId,
-        files
-      })
-    })
-    
-    if (response.ok) {
-      return await response.json()
-    }
-    
-    return null
-  } catch (error) {
-    console.error('Error saving project files:', error)
-    return null
-  }
-}
-
-export const getLivePreview = async (projectId: string): Promise<{ previewUrl?: string, status: string } | null> => {
-  try {
-    const response = await fetch(`/api/live-preview/${projectId}`)
-    
-    if (response.ok) {
-      return await response.json()
-    }
-    
-    return null
-  } catch (error) {
-    console.error('Error getting live preview:', error)
-    return null
-  }
-}

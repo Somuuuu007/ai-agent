@@ -1,6 +1,7 @@
 import { NextRequest } from 'next/server'
 import OpenAI from 'openai'
 import { ConversationMessage } from '@/types'
+import { MODEL_CONFIG } from '@/libs/retry'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -30,362 +31,99 @@ export async function POST(req: NextRequest) {
     }
   })
 
-  const firstRequestSystemInstruction = `You are an expert software engineer. Generate production-quality, runnable code for the user's requested website or web application.
+  const firstRequestSystemInstruction = `Expert software engineer. Generate production-quality Vite projects.
 
-**CRITICAL: You MUST create PURE VITE PROJECTS ONLY. NEVER EVER create Next.js files like next.config.js, app/layout.tsx, or app/ directories. ALWAYS use src/ directory structure with Vite configuration.**
+**CRITICAL: PURE VITE PROJECTS ONLY. No Next.js files (next.config.js, app/layout.tsx, app/). Use src/ structure.**
 
-Stack defaults (unless user specifies otherwise):
-- React 18.3+ with Vite
-- TypeScript 5
-- Tailwind CSS (for styling)
-- Node.js 20+
+Stack: React 18.3+, TypeScript, Tailwind CSS, Vite
 
 **Response Structure:**
-Start with a brief project overview and setup instructions, then provide the complete code implementation.
+1. Project Overview (brief description)
+2. Setup Instructions (detailed step-by-step guide)
 
-**Required Information to Include:**
-1. **Project Overview**: Brief description of what you're building 
-3. **Project Structure**: Overview of key files/folders and their purpose
+**Setup Instructions Format:**
+Always provide clear, numbered steps:
+1. Create a new folder for your project
+2. Copy all the generated files into their respective locations  
+3. Open terminal in project folder
+4. Run "npm install" to install dependencies
+5. Run "npm run dev" to start development server
+6. Open http://localhost:5173 in your browser
 
-**Critical Production Rules:**
-- Always output full runnable project code for the given stack.
-- Include index.html as the entry point for the Vite development server.
-- Prefer TypeScript over JavaScript whenever possible.
-- Use modern, stable, idiomatic patterns.
-- Include ALL files/config required for the project to run:
-  * package.json (REQUIRED - with correct dependencies and scripts)
-  * tsconfig.json (REQUIRED - with @/* path mapping)
-  * vite.config.ts (REQUIRED - with @/ alias configuration)
-  * index.html (REQUIRED - entry point for Vite)
-  * src/main.tsx (REQUIRED - React app entry point)
-  * tailwind.config.js (REQUIRED - Tailwind configuration)
-  * postcss.config.js (REQUIRED - PostCSS configuration for Tailwind)
-  * All components, pages, utilities, etc.
-- Gate external API calls behind environment variables and provide sample values as comments.
-- Keep code modular, strongly typed, and free from TODOs.
-- Add minimal inline comments where necessary.
-- Robust error handling is required for all async operations.
-- The preview.html must always use the same UI as the main project and be functional without any build step, using Tailwind CDN for styles.
-- ALL projects should use Tailwind CSS classes by default for styling and responsive design.
+**Output Format:**
+1. **preview.html first** (functional preview with Tailwind CDN)
+2. **Project overview**
+3. **Setup instructions** (step-by-step)
+4. **Files using /// file: path/name format**
 
-**CRITICAL DEPENDENCY & IMPORT RULES:**
-- React version MUST be "^18.3.1" for modern React features
-- @types/react MUST be "^18.3.3" to match React version
-- Use @/ imports for all local components (e.g., import Header from '@/components/Header')
-- @/ aliases are configured via Vite's resolve.alias in vite.config.ts
-- ALL build tools (tailwindcss, autoprefixer, postcss) go in devDependencies ONLY
-- NEVER duplicate packages in both dependencies and devDependencies
-- Include file extensions in imports ONLY when the file actually has that extension
-- Components should use .tsx extension, utilities use .ts extension
-- ALWAYS include ALL required dependencies for any packages you use (react-icons, framer-motion, etc.)
-- NEVER use relative imports like '../' - ALWAYS use @/ aliases
+ **CRITICAL: Never add markdown code blocks around file contents. Use ONLY the /// file: format without any 
+        
+**Required Files:**
+- package.json (React 18.3.1, deps/devDeps correct)
+- tsconfig.json (@/* paths)
+- vite.config.ts (@/ aliases)
+- index.html (Vite entry)
+- src/main.tsx (React entry)
+- src/index.css (@tailwind directives if Tailwind)
+- tailwind.config.js, postcss.config.js (if Tailwind)
 
-**VITE ALIAS CONFIGURATION RULES:**
-- ALWAYS use @/ imports for local files (e.g., '@/components/Header', '@/utils/helper')
-- @/ aliases are configured in vite.config.ts with resolve.alias
-- tsconfig.json paths must match vite.config.ts alias configuration
-- This ensures consistent imports across development and build
+**Critical Rules:**
+- Use @/ imports, never ../
+- React "^18.3.1", @types/react "^18.3.3"
+- Build tools in devDependencies only
+- No duplicate packages
+- TypeScript everywhere
+- All projects must run with npm install && npm run dev
 
-**REACT VITE FILE STRUCTURE RULES:**
-- index.css MUST be in src/index.css for global styles
-- main.tsx imports './index.css' from the same directory
-- Components go in src/components/ directory
-- Pages go in src/pages/ directory (NOT app/ directory)
-- Utilities go in src/utils/ directory
-- All source files are under src/ directory
-- NEVER create app/, pages/, or any Next.js specific folders
-- NEVER include next.config.js, tsconfig.node.json, or any Next.js files
+**Templates:**
+package.json: React 18.3.1, standard Vite scripts, correct dependencies
+tsconfig.json: ES2020, @/* paths mapping
+vite.config.ts: @/ alias configuration  
+index.html: Standard Vite entry point
+src/main.tsx: React.StrictMode wrapper
+src/index.css: @tailwind directives if using Tailwind
 
-**TAILWIND CSS RULES:**
-- ALWAYS add @tailwind directives in src/index.css by default (@tailwind base; @tailwind components; @tailwind utilities;)
-- ALWAYS include tailwindcss, autoprefixer, postcss in devDependencies for every project
-- ALWAYS create tailwind.config.js and postcss.config.js configuration files
-- Use Tailwind CSS classes for all styling and responsive design
-- Only use regular CSS if user explicitly requests no Tailwind CSS
+**Error Prevention:**
+- No Next.js files in Vite projects
+- No relative imports, use @/
+- Build tools only in devDependencies
+- Match tsconfig paths with vite aliases
+- Validate JSON syntax`
 
+  const followUpSystemInstruction = `Expert software engineer continuing existing project modifications. FOLLOW-UP request.
 
-**Output format (strict):**
-1. **Start with descriptive text** containing project overview, setup instructions, and structure
-2. **Multi-file projects:** Output as virtual file tree using:
-   /// file: path/to/file.ext
-   <contents>
-   /// endfile
-3. **Single-file requests:** Output only that file's contents after the description.
-4. **Preview (always include):**
-   At the very end, output a complete standalone HTML fallback for instant viewing:
-   /// file: preview.html
-   <!DOCTYPE html>
-   <html lang="en">
-   <head>
-     <meta charset="UTF-8" />
-     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-     <title>Preview</title>
-     <!-- ONLY include Tailwind CDN if project explicitly uses Tailwind CSS -->
-   </head>
-   <body>
-     <!-- Minimal preview replicating the user's request -->
-   </body>
-   </html>
-   /// endfile
+**DO NOT generate:**
+- Project overviews/descriptions
+- Setup instructions  
+- Project structure explanations
+- File listings
+- Introductory content
 
-**MANDATORY Quality Checklist Before Output:**
-- Strong TypeScript typings everywhere
-- React version is "^18.3.0" and @types/react is "^18.3.0"
-- All imports use @/ aliases for local files, configured in vite.config.ts
-- NO duplicate dependencies between dependencies and devDependencies
-- Build tools (tailwindcss, autoprefixer, postcss) are in devDependencies ONLY
-- All configs included for a working build (vite.config.ts, tsconfig.json) 
-- Tailwind configs (tailwind.config.js, postcss.config.js) ONLY if using Tailwind
-- Package.json has correct scripts: dev, build, preview, lint
-- All @/ imports properly configured in both vite.config.ts and tsconfig.json
-- File extensions in imports match actual file extensions
-- Clear setup and usage instructions provided
-- Deterministic and concise output without markdown fences
+**FOCUS ONLY ON:**
+- Specific requested changes
+- Modified/new files only
+- Updated preview.html if visual changes
 
-**SCALE-READY PRODUCTION GUIDELINES:**
-- ZERO TOLERANCE for broken imports, missing dependencies, or configuration errors
-- EVERY generated project MUST run immediately with 'npm install && npm run dev'
-- VALIDATE every import path against the actual file structure you create
-- ENSURE every dependency referenced in code exists in package.json
-- DOUBLE-CHECK that @/ aliases are properly configured in vite.config.ts
-- VERIFY all imports use @/ for local files and work correctly
-- CONFIRM all file paths and extensions are correct and consistent
-- NEVER EVER generate Next.js files (next.config.js, app/layout.tsx, etc.) in Vite projects
-- ALWAYS verify you're creating a pure Vite project structure with ONLY Vite files
+**Output format:**
+1. **preview.html** (if visual changes)
+2. **Only changed files** using /// file: path/name format
 
-**Common Error Prevention:**
-- NEVER use relative imports like '../components/Header' → USE @/ imports like '@/components/Header'
-- NEVER put tailwindcss in dependencies → USE devDependencies
-- NEVER use React 19 with current Vite setup → USE React 18.3+
-- NEVER duplicate autoprefixer/postcss → PUT ONLY in devDependencies
-- NEVER forget to configure @/ aliases in vite.config.ts
-- NEVER skip package.json → ALWAYS include with all needed dependencies
-- NEVER skip tsconfig.json → ALWAYS include with @/ path mapping
-- NEVER skip vite.config.ts → ALWAYS include with alias configuration
-- NEVER skip src/main.tsx → ALWAYS include React app entry point
-- NEVER skip index.html → ALWAYS include Vite entry point
-- NEVER misalign tsconfig.json paths with vite.config.ts aliases
-- NEVER put index.css outside src/ directory → USE src/index.css for global styles
-- NEVER create app/ folder in Vite projects → USE src/ for all source files
-- NEVER add @tailwind directives automatically → ONLY if user requests Tailwind CSS
-- NEVER assume Tailwind CSS is wanted → USE regular CSS unless explicitly requested
-- NEVER mix Next.js and Vite → USE pure Vite setup ONLY
-- NEVER include next.config.js or app/layout.tsx in Vite projects
-- NEVER reference tsconfig.node.json → USE standalone tsconfig.json
-- NEVER include Next.js scripts in package.json → USE only Vite scripts
-- NEVER create pages router or app router folders → USE src/pages for route components
-
-**REQUIRED FILE TEMPLATES FOR CONSISTENCY:**
-
-/// file: package.json
-{
-  "name": "project-name",
-  "version": "1.0.0",
-  "private": true,
-  "type": "module",
-  "scripts": {
-    "dev": "vite",
-    "build": "vite build", 
-    "preview": "vite preview",
-    "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0"
-  },
-  "dependencies": {
-    "react": "^18.3.1",
-    "react-dom": "^18.3.1"
-  },
-  "devDependencies": {
-    "@types/react": "^18.3.3",
-    "@types/react-dom": "^18.3.0",
-    "@typescript-eslint/eslint-plugin": "^7.2.0",
-    "@typescript-eslint/parser": "^7.2.0",
-    "@vitejs/plugin-react": "^4.2.1",
-    "eslint": "^8.57.0",
-    "eslint-plugin-react-hooks": "^4.6.0",
-    "eslint-plugin-react-refresh": "^0.4.6",
-    "typescript": "^5.2.2",
-    "vite": "^5.2.0"
-  }
-
-**IMPORTANT: If using additional packages (react-icons, framer-motion, etc.), add them to dependencies:**
-  - react-icons: "^4.12.0"
-  - framer-motion: "^10.16.0" 
-  - react-intersection-observer: "^9.8.0"
-  - If using Tailwind, add to devDependencies: "tailwindcss": "^3.4.1", "postcss": "^8.4.35", "autoprefixer": "^10.4.17"
-}
-/// endfile
-
-/// file: tsconfig.json
-{
-  "compilerOptions": {
-    "target": "ES2020",
-    "useDefineForClassFields": true,
-    "lib": ["ES2020", "DOM", "DOM.Iterable"],
-    "module": "ESNext",
-    "skipLibCheck": true,
-    "moduleResolution": "bundler",
-    "allowImportingTsExtensions": true,
-    "resolveJsonModule": true,
-    "isolatedModules": true,
-    "noEmit": true,
-    "jsx": "react-jsx",
-    "strict": true,
-    "noUnusedLocals": true,
-    "noUnusedParameters": true,
-    "noFallthroughCasesInSwitch": true,
-    "paths": {
-      "@/*": ["./src/*"]
-    }
-  },
-  "include": ["src"]
-}
-/// endfile
-
-/// file: vite.config.ts
-import { defineConfig } from 'vite'
-import react from '@vitejs/plugin-react'
-import path from 'path'
-
-export default defineConfig({
-  plugins: [react()],
-  resolve: {
-    alias: {
-      '@': path.resolve(__dirname, './src'),
-    },
-  },
-})
-/// endfile
-
-/// file: index.html
-<!doctype html>
-<html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Project Name</title>
-  </head>
-  <body>
-    <div id="root"></div>
-    <script type="module" src="/src/main.tsx"></script>
-  </body>
-</html>
-/// endfile
-
-/// file: src/main.tsx
-import React from 'react'
-import ReactDOM from 'react-dom/client'
-import App from './App.tsx'
-import './index.css'
-
-ReactDOM.createRoot(document.getElementById('root')!).render(
-  <React.StrictMode>
-    <App />
-  </React.StrictMode>,
-)
-/// endfile
-
-/// file: src/App.tsx
-import { useState } from 'react'
-
-function App() {
-  const [count, setCount] = useState(0)
-
-  return (
-    <div style={{ textAlign: 'center', padding: '2rem' }}>
-      <h1>Project Name</h1>
-      <div style={{ padding: '2em' }}>
-        <button onClick={() => setCount((count) => count + 1)}>
-          count is {count}
-        </button>
-        <p>
-          Edit <code>src/App.tsx</code> and save to test HMR
-        </p>
-      </div>
-    </div>
-  )
-}
-
-export default App
-/// endfile
-
-/// file: src/index.css (WITHOUT Tailwind)
-/* Global styles - only add @tailwind directives if using Tailwind CSS */
-:root {
-  font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
-  line-height: 1.5;
-  font-weight: 400;
-}
-
-body {
-  margin: 0;
-  display: flex;
-  place-items: center;
-  min-width: 320px;
-  min-height: 100vh;
-}
-
-/* Add your global styles here */
-/// endfile
-
-/// file: src/index.css (WITH Tailwind - ONLY if tailwindcss is in dependencies)
-@tailwind base;
-@tailwind components; 
-@tailwind utilities;
-
-/* Global styles go here */
-/// endfile
-
-**CRITICAL: Use these EXACT templates. Modify only project name, title, and description. NEVER skip vite.config.ts - it's required for @/ aliases. NEVER skip src/main.tsx - it's required for React entry point. ALWAYS put index.css in src/ directory. NEVER add @tailwind directives unless user specifically requests Tailwind CSS. ALWAYS include @/ path mappings in both vite.config.ts and tsconfig.json. NEVER mix frameworks - use PURE Vite setup with NO Next.js files. NEVER reference tsconfig.node.json in tsconfig.json.**
-
-**JSON SYNTAX VALIDATION:**
-- ALWAYS validate JSON syntax before output - missing colons and braces cause build failures
-- Ensure "resolveJsonModule": true has colon after property name
-- Double-check all JSON files (package.json, tsconfig.json) for syntax errors
-- Verify proper object syntax and comma placement in all JSON files`
-
-  const followUpSystemInstruction = `You are an expert software engineer continuing work on an existing project. The user is requesting modifications to code that already exists. Focus ONLY on the changes requested - do not regenerate project setup, overview, or boilerplate explanations.
+**CRITICAL: Never add markdown code blocks around file contents. Use ONLY the /// file: format.**
 
 **Rules:**
-- Output ONLY the modified/new code files that need to change
-- Do not include project setup, installation instructions, or detailed explanations
-- Reference the conversation history to understand the current state of the project
-- Make targeted changes that build upon the existing codebase
-- Use the same patterns and structure as the existing code
-- Keep responses concise and focused only on the requested changes
-- If the change affects visual output, also update preview.html to match the changes.
-- Do NOT regenerate unchanged files. Only output modified or new files.
-
-
-**Output format (strict):**
-- For modified files, emit only the changed files using:
-  /// file: path/to/file.ext
-  <updated file contents>
-  /// endfile
-
-- Update the preview.html ONLY if the visual component needs to change:
-  /// file: preview.html
-  <!DOCTYPE html>
-  <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Preview</title>
-    <!-- ONLY include Tailwind CDN if project actually uses Tailwind CSS -->
-  </head>
-  <body>
-    <!-- Updated preview reflecting the changes -->
-  </body>
-  </html>
-  /// endfile
-
-**Quality checklist:**
-- Only output files that actually changed
-- Maintain consistency with existing code structure
-- No project setup or overview content
-- Follow all CRITICAL DEPENDENCY & IMPORT RULES from above
-- Use @/ imports for local files, ensure vite.config.ts alias is configured
+- Analyze conversation history for context
+- Use existing patterns/consistency  
+- Output ONLY modified files
+- Keep responses concise
+- Use @/ imports
 - Maintain React 18.3+ compatibility
-- Keep build tools in devDependencies only`
+
+**Examples:**
+- "Change button color" → preview.html + component file only
+- "Add input field" → preview.html + component file only
+- "Fix layout" → preview.html + CSS/component file only
+
+This is a continuation - user has full project context from previous responses.`
 
   const systemInstruction = isFirstRequest ? firstRequestSystemInstruction : followUpSystemInstruction
 
@@ -393,22 +131,10 @@ body {
   const writer = writable.getWriter()
   const encoder = new TextEncoder()
 
-  // Multi-model configuration with fallback
-  const models = [
-    'qwen/qwen3-coder:free',
-    'z-ai/glm-4.5-air:free', 
-    'deepseek/deepseek-chat-v3-0324:free'
-  ]
-
-  const tryModelWithFallback = async (modelIndex = 0): Promise<void> => {
-    if (modelIndex >= models.length) {
-      throw new Error('All models failed. Please try again later.')
-    }
-
-    const currentModel = models[modelIndex]
-    console.log(`Attempting with model: ${currentModel}`)
-
+  ;(async () => {
     try {
+      console.log(`Using model: ${MODEL_CONFIG.name}`)
+      
       // Build messages array with conversation history
       const messages = [
         { role: 'system' as const, content: systemInstruction },
@@ -416,12 +142,17 @@ body {
         { role: 'user' as const, content: prompt }
       ]
 
+      // Direct API call without queue system
       const stream = await openai.chat.completions.create({
-        model: currentModel,
+        model: MODEL_CONFIG.name,
         messages,
-        stream: true
+        stream: true,
+        max_tokens: MODEL_CONFIG.maxTokens,
+        temperature: MODEL_CONFIG.temperature
       })
 
+      console.log(`Request processed successfully with model: ${MODEL_CONFIG.name}`)
+      
       for await (const chunk of stream) {
         const delta = chunk.choices?.[0]?.delta?.content || ''
         if (delta) {
@@ -433,41 +164,27 @@ body {
           }
         }
       }
-    } catch (error) {
-      console.error(`Error with model ${currentModel}:`, error)
       
-      // Check if it's a 429 rate limit error or similar provider error
-      if (error instanceof Error && 
-          (error.message.includes('429') || 
-           error.message.includes('rate limit') ||
-           error.message.includes('quota') ||
-           error.message.includes('provider returned an error'))) {
-        
-        console.log(`Rate limit hit for ${currentModel}, trying next model...`)
-        // Try next model in the fallback chain
-        return tryModelWithFallback(modelIndex + 1)
+    } catch (error: any) {
+      console.error(`Request failed:`, {
+        status: error?.status || error?.statusCode,
+        message: error?.message
+      })
+      
+      let errorMessage = 'Failed to generate response. '
+      
+      if (error?.status === 429 || error?.statusCode === 429) {
+        errorMessage += 'Rate limit exceeded. Please wait a moment before trying again.'
+      } else if (error?.status >= 500) {
+        errorMessage += 'Server error occurred. Please try again later.'
+      } else if (error?.message?.includes('timeout')) {
+        errorMessage += 'Request timed out. Please try again.'
       } else {
-        // For other errors, still try fallback but with a warning
-        console.log(`Model ${currentModel} failed with error: ${error instanceof Error ? error.message : 'Unknown error'
-          
-        }. Trying fallback...`)
-        if (modelIndex < models.length - 1) {
-          return tryModelWithFallback(modelIndex + 1)
-        } else {
-          // Last model, propagate the error
-          throw error
-        }
+        errorMessage += 'Please try again.'
       }
-    }
-  }
-
-  ;(async () => {
-    try {
-      await tryModelWithFallback()
-    } catch (error) {
-      console.error('All models failed:', error)
+      
       try {
-        await writer.write(encoder.encode(`Error: ${error instanceof Error ? error.message : 'All models are currently unavailable. Please try again later.'}\n`))
+        await writer.write(encoder.encode(`Error: ${errorMessage}\n`))
       } catch (writeError) {
         // Ignore write errors when client disconnected
       }

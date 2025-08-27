@@ -53,9 +53,25 @@ export const ResultsSection = ({
             <h3 className="text-lg font-semibold text-white mb-4 flex items-center">
               <Eye className="h-5 w-5 mr-2 text-purple-400" />
               Live Preview
+              {isLoading && (
+                <div className="ml-2 animate-spin h-4 w-4 border-2 border-purple-400 border-t-transparent rounded-full"></div>
+              )}
             </h3>
-            <div className="bg-white rounded-lg p-4 shadow-lg">
-              <div dangerouslySetInnerHTML={{ __html: generatedContent.preview }} />
+            <div className="bg-white rounded-lg p-4 shadow-lg min-h-[200px]">
+              {generatedContent.preview ? (
+                <div dangerouslySetInnerHTML={{ __html: generatedContent.preview }} />
+              ) : (
+                <div className="flex items-center justify-center h-full text-gray-500">
+                  {isLoading ? (
+                    <div className="text-center">
+                      <div className="animate-spin h-8 w-8 border-4 border-blue-500 border-t-transparent rounded-full mx-auto mb-2"></div>
+                      <p>Generating preview...</p>
+                    </div>
+                  ) : (
+                    <p>No preview available</p>
+                  )}
+                </div>
+              )}
             </div>
           </div>
         ) : (

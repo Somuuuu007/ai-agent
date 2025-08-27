@@ -1,6 +1,7 @@
-import { useState, useRef } from 'react'
+import { useState, useEffect } from 'react'
 import { GeneratedContent, AIAgentState, ConversationMessage } from '@/types'
-import { extractPreviewFromHTML, separateCodeAndText, extractFilesFromResponse, generateProjectId, saveProjectFiles } from '@/libs/utils'
+import { extractPreviewFromHTML, separateCodeAndText } from '@/libs/utils'
+
 
 export const useAIAgent = () => {
   const [state, setState] = useState<AIAgentState>({
@@ -12,53 +13,13 @@ export const useAIAgent = () => {
     lastPrompt: '',
     conversationHistory: [],
     isFirstRequest: true,
-    livePreviewUrl: undefined,
-    projectId: undefined
+    viewingPreviousResponse: null,
+    responseHistory: [],
+    projectId: null,
+    livePreviewUrl: null
   })
 
-  const pollingTimeoutRef = useRef<NodeJS.Timeout | null>(null)
 
-  const pollForLivePreview = async (projectId: string) => {
-    let attempts = 0
-    const maxAttempts = 30 // Poll for up to 30 seconds
-    
-    const poll = async () => {
-      try {
-        const response = await fetch(`/api/live-preview/${projectId}`)
-        if (response.ok) {
-          const data = await response.json()
-          if (data.status === 'running' && data.previewUrl) {
-            setState(prev => ({
-              ...prev,
-              livePreviewUrl: data.previewUrl
-            }))
-            console.log(`Live preview available at: ${data.previewUrl}`)
-            return
-          }
-        }
-        
-        attempts++
-        if (attempts < maxAttempts) {
-          pollingTimeoutRef.current = setTimeout(poll, 1000) // Poll every second
-        } else {
-          console.log('Live preview polling timeout')
-        }
-      } catch (error) {
-        console.error('Error polling for live preview:', error)
-        attempts++
-        if (attempts < maxAttempts) {
-          pollingTimeoutRef.current = setTimeout(poll, 1000)
-        }
-      }
-    }
-    
-    // Clear any existing polling
-    if (pollingTimeoutRef.current) {
-      clearTimeout(pollingTimeoutRef.current)
-    }
-    
-    poll()
-  }
 
   const handleInputChange = (value: string) => {
     setState(prev => ({ ...prev, input: value }))
@@ -70,19 +31,11 @@ export const useAIAgent = () => {
 
     const currentPrompt = state.input
 
-    // Clear any existing polling when starting a new request
-    if (pollingTimeoutRef.current) {
-      clearTimeout(pollingTimeoutRef.current)
-      pollingTimeoutRef.current = null
-    }
-
     setState(prev => ({
       ...prev,
       isLoading: true,
       generatedContent: null,
-      lastPrompt: currentPrompt,
-      livePreviewUrl: undefined, // Reset live preview URL
-      projectId: undefined // Reset project ID
+      lastPrompt: currentPrompt
     }))
 
     try {
@@ -103,56 +56,49 @@ export const useAIAgent = () => {
       const decoder = new TextDecoder()
       let aggregated = ''
       let finalContent: GeneratedContent | null = null
+      let hasPreviewStarted = false
+
+      // Set initial loading state showing both preview and code are being generated
+      setState(prev => ({
+        ...prev,
+        generatedContent: {
+          preview: '',
+          code: '',
+          description: 'Generating your project...'
+        }
+      }))
 
       while (true) {
         const { done, value } = await reader.read()
         if (done) break
         aggregated += decoder.decode(value, { stream: true })
 
+        // Extract both preview and code simultaneously as content streams in
         const preview = extractPreviewFromHTML(aggregated)
         const { code, description } = separateCodeAndText(aggregated)
-        finalContent = { preview, code, description }
         
+        // Show loading placeholders while content is being generated
+        const currentPreview = preview || (aggregated.includes('/// file: preview.html') 
+          ? '<div style="padding: 20px; text-align: center; color: #666;">🎨 Building your preview...</div>' 
+          : '')
+        
+        const currentCode = code || (aggregated.includes('/// file:') && !aggregated.includes('/// file: preview.html') 
+          ? '// Generating code files...\n// Please wait while your project is being created...' 
+          : '')
+        
+        finalContent = { 
+          preview: currentPreview,
+          code: currentCode,
+          description: description || 'Generating your project...' 
+        }
+        
+        // Update state with both preview and code as they become available
         setState(prev => ({
           ...prev,
           generatedContent: finalContent
         }))
       }
 
-      // Extract files and save them to project folder (non-blocking)
-      if (finalContent && aggregated) {
-        const extractedFiles = extractFilesFromResponse(aggregated)
-        if (extractedFiles.length > 0) {
-          const projectId = generateProjectId()
-          
-          // Save files and get live preview info
-          saveProjectFiles(projectId, extractedFiles)
-            .then((result) => {
-              if (result?.success) {
-                console.log(`Project files saved to ai-previews/${projectId}`)
-                
-                // Update state with live preview info
-                setState(prev => ({
-                  ...prev,
-                  projectId: projectId,
-                  livePreviewUrl: result.livePreview?.previewUrl
-                }))
-
-                if (result.livePreview) {
-                  console.log(`Live preview available at: ${result.livePreview.previewUrl}`)
-                } else {
-                  // Start polling for live preview if not immediately available
-                  pollForLivePreview(projectId)
-                }
-              } else {
-                console.warn('Failed to save project files')
-              }
-            })
-            .catch((error) => {
-              console.error('Error saving project files:', error)
-            })
-        }
-      }
 
       // Add messages to conversation history
       const newUserMessage: ConversationMessage = {
@@ -164,19 +110,58 @@ export const useAIAgent = () => {
       const newAssistantMessage: ConversationMessage = {
         role: 'assistant', 
         content: finalContent?.description || aggregated,
-        timestamp: Date.now()
+        timestamp: Date.now(),
+        generatedContent: finalContent || undefined
       }
 
+      setState(prev => {
+        // Generate project ID for first request or maintain existing one
+        const currentProjectId = prev.projectId || `project-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+        
+        return { 
+          ...prev, 
+          isLoading: false,
+          input: '', // Clear input after successful submission
+          conversationHistory: [...prev.conversationHistory, newUserMessage, newAssistantMessage],
+          responseHistory: finalContent ? [...prev.responseHistory, finalContent] : prev.responseHistory,
+          isFirstRequest: false, // No longer the first request
+          viewingPreviousResponse: null, // Reset to current response
+          projectId: currentProjectId
+        }
+      })
+    } catch (error) {
+      console.error('Error generating content:', error)
+      
+      // Determine error message based on response status
+      let errorMessage = 'Failed to generate content. Please try again.'
+      
+      if (error instanceof Error) {
+        if (error.message.includes('429') || error.message.includes('rate limit')) {
+          errorMessage = 'Rate limit exceeded. Your request has been queued and will be processed automatically. Please wait a moment.'
+        } else if (error.message.includes('queue is full')) {
+          errorMessage = 'System is currently overloaded. Please try again in a few minutes.'
+        } else if (error.message.includes('timeout')) {
+          errorMessage = 'Request timed out due to high demand. Please try again.'
+        } else if (error.message.includes('500')) {
+          errorMessage = 'Server error occurred. Please try again in a few minutes.'
+        } else if (error.message.includes('network') || error.message.includes('fetch')) {
+          errorMessage = 'Network error. Please check your connection and try again.'
+        }
+      }
+      
+      // Set error state with user-friendly message
       setState(prev => ({ 
         ...prev, 
         isLoading: false,
-        input: '', // Clear input after successful submission
-        conversationHistory: [...prev.conversationHistory, newUserMessage, newAssistantMessage],
-        isFirstRequest: false // No longer the first request
+        generatedContent: {
+          preview: `<div style="padding: 20px; text-align: center; color: #e74c3c; background: #fdf2f2; border: 1px solid #e74c3c; border-radius: 8px; margin: 20px;">
+            <h3 style="margin: 0 0 10px 0; color: #c0392b;">⚠️ Generation Failed</h3>
+            <p style="margin: 0; color: #e74c3c;">${errorMessage}</p>
+          </div>`,
+          code: '',
+          description: errorMessage
+        }
       }))
-    } catch (error) {
-      console.error('Error generating content:', error)
-      setState(prev => ({ ...prev, isLoading: false }))
     }
   }
 
@@ -185,8 +170,12 @@ export const useAIAgent = () => {
   }
 
   const copyToClipboard = async () => {
-    if (state.generatedContent?.code) {
-      await navigator.clipboard.writeText(state.generatedContent.code)
+    const contentToCopy = state.viewingPreviousResponse !== null 
+      ? state.responseHistory[state.viewingPreviousResponse]?.code
+      : state.generatedContent?.code
+      
+    if (contentToCopy) {
+      await navigator.clipboard.writeText(contentToCopy)
       setState(prev => ({ ...prev, copiedCode: true }))
       setTimeout(() => {
         setState(prev => ({ ...prev, copiedCode: false }))
@@ -194,11 +183,30 @@ export const useAIAgent = () => {
     }
   }
 
+  const viewPreviousResponse = (index: number) => {
+    setState(prev => ({ ...prev, viewingPreviousResponse: index }))
+  }
+
+  const viewCurrentResponse = () => {
+    setState(prev => ({ ...prev, viewingPreviousResponse: null }))
+  }
+
+  // Get the content to display (either current or previous)
+  const getDisplayContent = (): GeneratedContent | null => {
+    if (state.viewingPreviousResponse !== null) {
+      return state.responseHistory[state.viewingPreviousResponse] || null
+    }
+    return state.generatedContent
+  }
+
   return {
     ...state,
     handleInputChange,
     handleSubmit,
     setActiveTab,
-    copyToClipboard
+    copyToClipboard,
+    viewPreviousResponse,
+    viewCurrentResponse,
+    getDisplayContent
   }
 }
