@@ -1,4 +1,5 @@
 import React, { useMemo } from 'react'
+import { stripAllHTMLContent } from '@/libs/utils'
 
 interface FormattedResponseProps {
   content: string
@@ -15,19 +16,8 @@ export const FormattedResponse: React.FC<FormattedResponseProps> = ({ content })
         return null
       }
       
-      // More thorough cleanup - remove code blocks and file markers
-      const cleanedText = content
-        .replace(/\/\/\/ file: [\s\S]*?(?=\/\/\/ (?:file:|endfile)|$)/g, '')
-        .replace(/\/\/\/ endfile/g, '')
-        .replace(/```[\s\S]*?```/g, '') // Remove markdown code blocks
-        .replace(/```[a-zA-Z]*\s*$/gm, '') // Remove trailing ``` with language specifiers
-        .replace(/```\s*$/gm, '') // Remove trailing ``` without language specifiers
-        .replace(/^```[a-zA-Z]*\s*\n?/gm, '') // Remove starting ``` with language specifiers
-        .replace(/^```\s*\n?/gm, '') // Remove starting ``` without language specifiers
-        .replace(/```[a-zA-Z]*\s*/g, '') // Remove any remaining ``` with language in middle
-        .replace(/```/g, '') // Remove any remaining standalone ```
-        .replace(/\n\s*\n\s*\n+/g, '\n\n')
-        .trim()
+      // Aggressive cleanup - remove ALL HTML content and technical markers
+      const cleanedText = stripAllHTMLContent(content)
 
     if (!cleanedText) return null
 
@@ -68,7 +58,7 @@ export const FormattedResponse: React.FC<FormattedResponseProps> = ({ content })
       // Removed project structure handling
       
       // Skip empty or unwanted sections
-      const isUnwantedSection = /^(file\s+list|files\s+list|generated\s+files)[\s]*:?[\s]*$/i.test(firstLine)
+      const isUnwantedSection = /^(files?|file\s+list|files\s+list|generated\s+files|project\s+files)[\s]*:?[\s]*$/i.test(firstLine)
       
       if (isUnwantedSection) {
         return null // Skip these sections entirely
@@ -83,6 +73,13 @@ export const FormattedResponse: React.FC<FormattedResponseProps> = ({ content })
           .replace(/^then\s+/i, '') // Remove "then" prefix from AI responses
           .trim()
         const contentLines = lines.slice(1)
+        
+        // Only skip headings that are specifically unwanted AND have no content
+        // This is a fallback check - the main filtering happens above with isUnwantedSection
+        const isEmptyFileSection = /^files?$/i.test(headingText) && contentLines.every(line => line.trim().length === 0)
+        if (isEmptyFileSection) {
+          return null
+        }
         
         return (
           <div key={index} className="mb-6 mt-8">
@@ -153,26 +150,14 @@ export const FormattedResponse: React.FC<FormattedResponseProps> = ({ content })
     }).filter(Boolean)
     } catch (error) {
       console.error('Error formatting response:', error)
-      // Fallback: return basic formatted content with cleanup
-      const cleanedFallbackContent = content
-        ?.replace(/\/\/\/ file: [\s\S]*?(?=\/\/\/ (?:file:|endfile)|$)/g, '')
-        .replace(/\/\/\/ endfile/g, '')
-        .replace(/```[\s\S]*?```/g, '') // Remove markdown code blocks
-        .replace(/```[a-zA-Z]*\s*$/gm, '') // Remove trailing ``` with language specifiers
-        .replace(/```\s*$/gm, '') // Remove trailing ``` without language specifiers
-        .replace(/^```[a-zA-Z]*\s*\n?/gm, '') // Remove starting ``` with language specifiers
-        .replace(/^```\s*\n?/gm, '') // Remove starting ``` without language specifiers
-        .replace(/```[a-zA-Z]*\s*/g, '') // Remove any remaining ``` with language in middle
-        .replace(/```/g, '') // Remove any remaining standalone ```
-        .trim() || ''
+      // Fallback: return basic formatted content with aggressive cleanup
+      const cleanedFallbackContent = stripAllHTMLContent(content || '')
         
       const fallbackParts = cleanedFallbackContent.split('\n\n').filter(part => part.trim())
       return fallbackParts.map((part, index) => (
         <div key={index} className="mb-4 text-gray-200 leading-relaxed text-base">
           {part.split('\n').map((line, lineIndex) => {
             const cleanLine = line.trim()
-              .replace(/```[a-zA-Z]*\s*/g, '') // Final cleanup of any remaining markers
-              .replace(/```/g, '')
             return (
               <div key={lineIndex} className="mb-2">
                 {cleanLine}

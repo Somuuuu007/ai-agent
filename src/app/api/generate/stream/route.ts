@@ -44,11 +44,12 @@ Stack: React 18.3+, TypeScript, Tailwind CSS, Vite
 **Setup Instructions Format:**
 Always provide clear, numbered steps:
 1. Create a new folder for your project
-2. Copy all the generated files into their respective locations  
-3. Open terminal in project folder
-4. Run "npm install" to install dependencies
-5. Run "npm run dev" to start development server
-6. Open http://localhost:5173 in your browser
+2. Create a new Vite project using "npm create vite@latest"
+3. Copy all the generated files into their respective locations  
+4. Open terminal in project folder
+5. Run "npm install" to install dependencies
+6. Run "npm run dev" to start development server
+7. Open http://localhost:5173 in your browser
 
 **Output Format:**
 1. **preview.html first** (functional preview with Tailwind CDN)
@@ -92,38 +93,128 @@ src/index.css: @tailwind directives if using Tailwind
 
   const followUpSystemInstruction = `Expert software engineer continuing existing project modifications. FOLLOW-UP request.
 
+**CONTEXT ANALYSIS:** Analyze the conversation history to understand:
+- What files currently exist in the project
+- Current project structure and components  
+- Previous styling/functionality that was implemented
+- Technologies and patterns being used
+
+**CRITICAL OUTPUT REQUIREMENTS:**
+1. **ALWAYS generate preview.html first** - Updated preview showing the requested changes
+2. **ONLY generate files that need modification** - Never regenerate unchanged files
+3. **Use exact same file paths** as in conversation history
+4. **Maintain all existing functionality** while applying requested changes
+
 **DO NOT generate:**
 - Project overviews/descriptions
 - Setup instructions  
-- Project structure explanations
-- File listings
-- Introductory content
+- File listings or project explanations
+- Complete project regeneration
 
-**FOCUS ONLY ON:**
-- Specific requested changes
-- Modified/new files only
-- Updated preview.html if visual changes
+**Output format (STRICT):**
+/// file: preview.html
+<!DOCTYPE html>
+[Updated preview with changes applied]
+</html>
 
-**Output format:**
-1. **preview.html** (if visual changes)
-2. **Only changed files** using /// file: path/name format
+/// file: path/to/changed/file.ext
+[Only the modified file content]
 
 **CRITICAL: Never add markdown code blocks around file contents. Use ONLY the /// file: format.**
 
-**Rules:**
-- Analyze conversation history for context
-- Use existing patterns/consistency  
-- Output ONLY modified files
-- Keep responses concise
-- Use @/ imports
-- Maintain React 18.3+ compatibility
+**Context-Aware Rules:**
+- Reference existing components/files from conversation history
+- Keep same import patterns and file structure  
+- Apply changes while preserving existing functionality
+- Update preview to reflect the exact requested changes
+- Use same tech stack (React 18.3+, TypeScript, Tailwind, etc.)
 
-**Examples:**
-- "Change button color" → preview.html + component file only
-- "Add input field" → preview.html + component file only
-- "Fix layout" → preview.html + CSS/component file only
+**Token Efficiency:** 
+- Focus only on the specific requested change
+- Don't repeat unchanged code
+- Reference existing patterns from conversation history`
 
-This is a continuation - user has full project context from previous responses.`
+  // Function to create token-efficient context for follow-up requests
+  const createFollowUpContext = (conversationHistory: ConversationMessage[]): ConversationMessage[] => {
+    if (conversationHistory.length === 0) return []
+    
+    // Find the last assistant response (contains the generated project)
+    const lastAssistantResponse = [...conversationHistory].reverse().find(msg => msg.role === 'assistant')
+    
+    if (!lastAssistantResponse) return conversationHistory
+    
+    // Extract comprehensive project context from the last response
+    const extractProjectContext = (response: string) => {
+      const fileBlocks = response.match(/\/\/\/ file: [^\n]+/g) || []
+      const existingFiles = fileBlocks.map(block => block.replace('/// file: ', '')).filter(file => file !== 'preview.html')
+      
+      // Detect project type and technologies with more precision
+      const hasTailwind = response.includes('tailwind') || response.includes('Tailwind') || response.includes('@tailwind')
+      const hasTypeScript = response.includes('.tsx') || response.includes('.ts')
+      const hasRouter = response.includes('react-router') || response.includes('router')
+      const hasStateManagement = response.includes('useState') || response.includes('useReducer') || response.includes('Context')
+      
+      // Extract component names and structure
+      const components = existingFiles
+        .filter(f => f.includes('components/') || f.includes('src/') && f.includes('.tsx'))
+        .map(f => f.split('/').pop()?.replace('.tsx', '') || f)
+      
+      // Detect main application patterns
+      const projectType = response.toLowerCase().includes('todo') ? 'Todo List App' : 
+                         response.toLowerCase().includes('portfolio') ? 'Portfolio Website' :
+                         response.toLowerCase().includes('dashboard') ? 'Dashboard' :
+                         response.toLowerCase().includes('ecommerce') ? 'E-commerce Site' :
+                         response.toLowerCase().includes('blog') ? 'Blog' :
+                         'React Application'
+      
+      // Extract key functionality patterns
+      const features = []
+      if (response.includes('useState') || response.includes('state')) features.push('State Management')
+      if (response.includes('useEffect')) features.push('Effects/API Calls')
+      if (response.includes('onClick') || response.includes('event')) features.push('User Interactions')
+      if (response.includes('form') || response.includes('input')) features.push('Forms')
+      if (response.includes('map(') || response.includes('list')) features.push('Dynamic Lists')
+      
+      return {
+        projectType,
+        existingFiles,
+        components,
+        features,
+        technologies: ['React 18.3+', 'TypeScript', hasTailwind ? 'Tailwind CSS' : 'CSS', 'Vite'].filter(Boolean),
+        hasComponents: existingFiles.some(f => f.includes('components/')),
+        hasRouter,
+        hasStateManagement
+      }
+    }
+    
+    const context = extractProjectContext(lastAssistantResponse.content)
+    
+    // Create enhanced condensed context message
+    const condensedContext: ConversationMessage = {
+      role: 'assistant',
+      content: `PROJECT STATE CONTEXT:
+Type: ${context.projectType}
+Stack: ${context.technologies.join(', ')}
+Files: ${context.existingFiles.join(', ')}
+Components: [${context.components.join(', ')}]
+Features: ${context.features.length > 0 ? context.features.join(', ') : 'Basic React App'}
+State Management: ${context.hasStateManagement ? 'Yes (useState/hooks)' : 'No'}
+
+CURRENT ARCHITECTURE:
+- ${context.hasComponents ? 'Component-based structure' : 'Simple single-file structure'}
+- ${context.hasRouter ? 'Multi-page routing enabled' : 'Single-page application'}
+- ${context.technologies.includes('Tailwind CSS') ? 'Tailwind CSS for styling' : 'Regular CSS styling'}
+
+LAST USER REQUEST: "${conversationHistory[conversationHistory.length - 2]?.content || 'Initial project creation'}"
+
+For follow-up modifications, maintain existing patterns and only modify necessary files.`,
+      timestamp: Date.now()
+    }
+    
+    // Return only the last user message and condensed context (saves significant tokens)
+    const lastUserMessage = conversationHistory[conversationHistory.length - 2]
+    return lastUserMessage ? [condensedContext] : []
+  }
 
   const systemInstruction = isFirstRequest ? firstRequestSystemInstruction : followUpSystemInstruction
 
@@ -134,11 +225,21 @@ This is a continuation - user has full project context from previous responses.`
   ;(async () => {
     try {
       console.log(`Using model: ${MODEL_CONFIG.name}`)
+      console.log(`Request type: ${isFirstRequest ? 'First Request' : 'Follow-up Request'}`)
       
-      // Build messages array with conversation history
+      // Build messages array with context-aware conversation history
+      const contextualHistory = isFirstRequest ? 
+        conversationHistory.map((msg: ConversationMessage) => ({ role: msg.role, content: msg.content })) :
+        createFollowUpContext(conversationHistory)
+        
+      if (!isFirstRequest) {
+        console.log(`Context history length: ${conversationHistory.length}`)
+        console.log(`Contextual history length: ${contextualHistory.length}`)
+      }
+        
       const messages = [
         { role: 'system' as const, content: systemInstruction },
-        ...conversationHistory.map((msg: ConversationMessage) => ({ role: msg.role, content: msg.content })),
+        ...contextualHistory,
         { role: 'user' as const, content: prompt }
       ]
 

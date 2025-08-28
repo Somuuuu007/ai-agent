@@ -347,7 +347,7 @@ export default function AIAgentPage() {
                                     </head>
                                     <body>${displayContent.preview || ''}</body>
                                     </html>`}
-                                  className="w-full h-[60vh] border border-white/20 rounded-lg bg-white"
+                                  className="w-[114vh] h-[73vh] border border-white/20 rounded-lg bg-white"
                                   title="Static Preview"
                                   sandbox="allow-scripts allow-same-origin allow-forms"
                                 />

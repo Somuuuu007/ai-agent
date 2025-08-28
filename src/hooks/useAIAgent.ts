@@ -109,7 +109,7 @@ export const useAIAgent = () => {
 
       const newAssistantMessage: ConversationMessage = {
         role: 'assistant', 
-        content: finalContent?.description || aggregated,
+        content: finalContent?.description || 'Content generated successfully!',
         timestamp: Date.now(),
         generatedContent: finalContent || undefined
       }
