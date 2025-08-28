@@ -175,17 +175,17 @@ export default function AIAgentPage() {
                           )}
                         </div>
                         
-                        {/* Add "View Previous Response" button after each assistant message with generated content, but only from the 2nd response onwards */}
-                        {hasGeneratedContent && responseIndex >= 0 && responseIndex > 0 && (
+                        {/* Add "View Generated Project" button after rate limit message */}
+                        {hasGeneratedContent && responseIndex >= 0 && message.content.includes('Rate Limit Exceeded') && (
                           <div className="flex justify-start pl-2 mt-2 space-x-3">
                             <button
                               onClick={() => {
-                                viewPreviousResponse(responseIndex)
+                                viewPreviousResponse(0) // Always show the first (and only) request's content
                                 setShowOutput(true)
                               }}
                               className="px-3 py-1.5 bg-purple-600/20 hover:bg-purple-600/30 border border-purple-500/30 hover:border-purple-500/50 rounded-lg text-purple-300 hover:text-purple-200 text-xs font-medium transition-all hover:transform hover:-translate-y-0.5"
                             >
-                              View Previous Response
+                              View Generated Project
                             </button>
                           </div>
                         )}
@@ -231,24 +231,23 @@ export default function AIAgentPage() {
                   {(generatedContent || viewingPreviousResponse !== null) && (
                     <div className="flex justify-start pl-2 space-x-3">
                       <button
-                        onClick={() => setShowOutput(v => !v)}
-                        className="px-4 py-2 bg-white/5 hover:bg-white/10 border border-white/10 hover:border-white/20 rounded-lg text-white text-xs font-medium transition-all hover:transform hover:-translate-y-0.5"
-                      >
-                        {showOutput ? 'Hide output' : 'Show output'}
-                      </button>
-                      
-                      {/* Show "Back to Current" button when viewing previous response */}
-                      {viewingPreviousResponse !== null && (
-                        <button
-                          onClick={() => {
+                        onClick={() => {
+                          if (viewingPreviousResponse !== null) {
+                            // Currently viewing previous response - go back to current
                             viewCurrentResponse()
                             setShowOutput(true)
-                          }}
-                          className="px-4 py-2 bg-green-600/20 hover:bg-green-600/30 border border-green-500/30 hover:border-green-500/50 rounded-lg text-green-300 hover:text-green-200 text-xs font-medium transition-all hover:transform hover:-translate-y-0.5"
-                        >
-                          Back to Current
-                        </button>
-                      )}
+                          } else {
+                            // Currently viewing current response - toggle output
+                            setShowOutput(v => !v)
+                          }
+                        }}
+                        className="px-4 py-2 bg-white/5 hover:bg-white/10 border border-white/10 hover:border-white/20 rounded-lg text-white text-xs font-medium transition-all hover:transform hover:-translate-y-0.5"
+                      >
+                        {viewingPreviousResponse !== null 
+                          ? 'Hide previous response'
+                          : (showOutput ? 'Hide output' : 'Show output')
+                        }
+                      </button>
                       
                     </div>
                   )}
@@ -329,7 +328,7 @@ export default function AIAgentPage() {
                                 // Complete HTML document - use iframe
                                 <iframe
                                   srcDoc={displayContent.preview}
-                                  className="w-[114vh] h-[73vh] border border-white/20 rounded-lg bg-white"
+                                  className="w-[114vh] h-[73vh] border border-white/20 rounded-lg bg-white "
                                   title="Static Preview"
                                   sandbox="allow-scripts allow-same-origin allow-forms"
                                 />

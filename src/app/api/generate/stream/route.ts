@@ -227,6 +227,23 @@ For follow-up modifications, maintain existing patterns and only modify necessar
       console.log(`Using model: ${MODEL_CONFIG.name}`)
       console.log(`Request type: ${isFirstRequest ? 'First Request' : 'Follow-up Request'}`)
       
+      // Rate limiting: Only allow first request, block follow-ups
+      if (!isFirstRequest) {
+        console.log('Follow-up request blocked due to rate limiting')
+        const rateLimitMessage = `## Rate Limit Exceeded
+
+You have reached the request limit for this session. To make a new request wait for some time :
+
+*Refresh the page to start a new session*
+
+This limit helps us manage API costs while providing the best experience. Thank you for understanding!
+
+*Note: Follow-up functionality will be available in future updates.*`
+
+        await writer.write(encoder.encode(rateLimitMessage))
+        return
+      }
+      
       // Build messages array with context-aware conversation history
       const contextualHistory = isFirstRequest ? 
         conversationHistory.map((msg: ConversationMessage) => ({ role: msg.role, content: msg.content })) :
