@@ -234,11 +234,12 @@ For follow-up modifications, maintain existing patterns and only modify necessar
 
 You have reached the request limit for this session. To make a new request wait for some time :
 
-*Refresh the page to start a new session*
-
 This limit helps us manage API costs while providing the best experience. Thank you for understanding!
 
-*Note: Follow-up functionality will be available in future updates.*`
+*Note:*
+Follow-up functionality will be available in future updates.
+Refresh the page to start a new session.
+`
 
         await writer.write(encoder.encode(rateLimitMessage))
         return

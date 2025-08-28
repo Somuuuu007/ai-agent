@@ -175,17 +175,24 @@ export default function AIAgentPage() {
                           )}
                         </div>
                         
-                        {/* Add "View Generated Project" button after rate limit message */}
+                        {/* Add smart toggle button after rate limit message */}
                         {hasGeneratedContent && responseIndex >= 0 && message.content.includes('Rate Limit Exceeded') && (
                           <div className="flex justify-start pl-2 mt-2 space-x-3">
                             <button
                               onClick={() => {
-                                viewPreviousResponse(0) // Always show the first (and only) request's content
-                                setShowOutput(true)
+                                if (viewingPreviousResponse !== null) {
+                                  // Currently viewing previous response - go back to current (rate limit message)
+                                  viewCurrentResponse()
+                                  setShowOutput(false)
+                                } else {
+                                  // Currently viewing current (rate limit message) - show previous response
+                                  viewPreviousResponse(0)
+                                  setShowOutput(true)
+                                }
                               }}
                               className="px-3 py-1.5 bg-purple-600/20 hover:bg-purple-600/30 border border-purple-500/30 hover:border-purple-500/50 rounded-lg text-purple-300 hover:text-purple-200 text-xs font-medium transition-all hover:transform hover:-translate-y-0.5"
                             >
-                              View Generated Project
+                              {viewingPreviousResponse !== null ? 'Hide previous response' : 'Show previous response'}
                             </button>
                           </div>
                         )}
@@ -228,7 +235,9 @@ export default function AIAgentPage() {
                     </>
                   )}
                   
-                  {(generatedContent || viewingPreviousResponse !== null) && (
+                  {(generatedContent || viewingPreviousResponse !== null) && 
+                   // Only show this button if we're not in a rate limit scenario (no rate limit message in conversation)
+                   !conversationHistory.some(msg => msg.content.includes('Rate Limit Exceeded')) && (
                     <div className="flex justify-start pl-2 space-x-3">
                       <button
                         onClick={() => {
@@ -342,7 +351,21 @@ export default function AIAgentPage() {
                                       <meta name="viewport" content="width=device-width, initial-scale=1.0">
                                       <title>Preview</title>
                                       <script src="https://cdn.tailwindcss.com"></script>
-                                      <style>body { padding: 1rem; }</style>
+                                      <style>
+                                        body { 
+                                          padding: 1rem; 
+                                          display: flex; 
+                                          justify-content: center; 
+                                          align-items: center; 
+                                          min-height: 100vh; 
+                                          margin: 0;
+                                        }
+                                        /* Ensure content can still grow if larger than viewport */
+                                        body > * { 
+                                          max-width: 100%; 
+                                          flex-shrink: 0; 
+                                        }
+                                      </style>
                                     </head>
                                     <body>${displayContent.preview || ''}</body>
                                     </html>`}
