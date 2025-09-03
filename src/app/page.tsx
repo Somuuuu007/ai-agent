@@ -16,14 +16,14 @@ export default function AIAgentPage() {
     isLoading,
     generatedContent,
     activeTab,
-    copiedCode,
+    
     handleInputChange,
     handleSubmit,
     setActiveTab,
-    copyToClipboard,
+    
     lastPrompt,
     conversationHistory,
-    livePreviewUrl,
+
     projectId,
     viewPreviousResponse,
     viewCurrentResponse,
@@ -350,22 +350,28 @@ export default function AIAgentPage() {
                                       <meta charset="UTF-8">
                                       <meta name="viewport" content="width=device-width, initial-scale=1.0">
                                       <title>Preview</title>
+                                      <base href="about:blank">
                                       <script src="https://cdn.tailwindcss.com"></script>
                                       <style>
                                         body { 
-                                          padding: 1rem; 
-                                          display: flex; 
-                                          justify-content: center; 
-                                          align-items: center; 
-                                          min-height: 100vh; 
                                           margin: 0;
-                                        }
-                                        /* Ensure content can still grow if larger than viewport */
-                                        body > * { 
-                                          max-width: 100%; 
-                                          flex-shrink: 0; 
+                                          padding: 0;
                                         }
                                       </style>
+                                      <script>
+                                        document.addEventListener('DOMContentLoaded', function() {
+                                          // Prevent all navigation within the iframe
+                                          document.addEventListener('click', function(e) {
+                                            const target = e.target.closest('a');
+                                            if (target && target.href) {
+                                              e.preventDefault();
+                                              // For demo purposes, just scroll to top or show some feedback
+                                              window.scrollTo(0, 0);
+                                              return false;
+                                            }
+                                          });
+                                        });
+                                      </script>
                                     </head>
                                     <body>${displayContent.preview || ''}</body>
                                     </html>`}

@@ -33,6 +33,10 @@ export async function POST(req: NextRequest) {
 
   const firstRequestSystemInstruction = `Expert software engineer. Generate production-quality Vite projects.
 
+**🚨 ABSOLUTE RULE: NO MARKDOWN CODE BLOCKS EVER 🚨**
+NEVER use triple backticks with json, typescript, html, css or ANY code blocks around file contents.
+ONLY use /// file: format with plain text content.
+
 **CRITICAL: PURE VITE PROJECTS ONLY. No Next.js files (next.config.js, app/layout.tsx, app/). Use src/ structure.**
 
 Stack: React 18.3+, TypeScript, Tailwind CSS, Vite
@@ -57,7 +61,26 @@ Always provide clear, numbered steps:
 3. **Setup instructions** (step-by-step)
 4. **Files using /// file: path/name format**
 
- **CRITICAL: Never add markdown code blocks around file contents. Use ONLY the /// file: format without any 
+**ABSOLUTELY CRITICAL - NO MARKDOWN CODE BLOCKS:**
+- NEVER use triple backticks json, javascript, typescript, html, css or ANY code blocks
+- NEVER wrap file contents in markdown formatting
+- Use ONLY the /// file: format
+- File contents must be RAW text without any wrapping
+
+**WRONG FORMAT EXAMPLES (DO NOT DO THIS):**
+Triple backticks json
+{content}
+Triple backticks end
+Triple backticks typescript  
+{content}
+Triple backticks end
+
+**CORRECT FORMAT ONLY:**
+/// file: package.json
+{content}
+
+/// file: src/App.tsx
+{content} 
         
 **Required Files:**
 - package.json (React 18.3.1, deps/devDeps correct)
@@ -93,6 +116,10 @@ src/index.css: @tailwind directives if using Tailwind
 
   const followUpSystemInstruction = `Expert software engineer continuing existing project modifications. FOLLOW-UP request.
 
+**🚨 ABSOLUTE RULE: NO MARKDOWN CODE BLOCKS EVER 🚨**
+NEVER use triple backticks with json, typescript, html, css or ANY code blocks around file contents.
+ONLY use /// file: format with plain text content.
+
 **CONTEXT ANALYSIS:** Analyze the conversation history to understand:
 - What files currently exist in the project
 - Current project structure and components  
@@ -120,7 +147,11 @@ src/index.css: @tailwind directives if using Tailwind
 /// file: path/to/changed/file.ext
 [Only the modified file content]
 
-**CRITICAL: Never add markdown code blocks around file contents. Use ONLY the /// file: format.**
+**ABSOLUTELY CRITICAL - NO MARKDOWN CODE BLOCKS EVER:**
+- NO triple backticks json, javascript, typescript, html, css, markdown
+- NO code block wrapping of ANY kind
+- ONLY use /// file: format with raw content
+- File content must be unwrapped plain text
 
 **Context-Aware Rules:**
 - Reference existing components/files from conversation history
