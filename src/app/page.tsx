@@ -1,6 +1,6 @@
 'use client'
 
-import { Eye, Code, Copy, Check, Loader2, Sparkles } from 'lucide-react'
+import { Eye, Code, Loader2 } from 'lucide-react'
 import { Header } from '@/components/ui/Header'
 import { InputSection } from '@/components/ui/InputSection'
 import { FormattedResponse } from '@/components/ui/FormattedResponse'
@@ -24,12 +24,12 @@ export default function AIAgentPage() {
     lastPrompt,
     conversationHistory,
 
-    projectId,
+    // projectId,
     viewPreviousResponse,
     viewCurrentResponse,
     getDisplayContent,
     viewingPreviousResponse,
-    responseHistory
+    // responseHistory
   } = useAIAgent()
 
   const [showOutput, setShowOutput] = useState(false)
@@ -67,35 +67,35 @@ export default function AIAgentPage() {
     }
   }, [lastPrompt])
 
-  const handleLivePreview = async () => {
-    if (!projectId) return
-    
-    try {
-      console.log('Starting live preview for project:', projectId)
-      
-      // First try to get or start the live preview
-      const response = await fetch(`/api/live-preview/${projectId}`)
-      
-      if (response.ok) {
-        const data = await response.json()
-        console.log('Live preview response:', data)
-        
-        if (data.previewUrl) {
-          // Open live preview in new tab
-          window.open(data.previewUrl, '_blank')
-        } else {
-          console.error('No preview URL available')
-          alert('Live preview is starting... Please try again in a few seconds.')
-        }
-      } else {
-        console.error('Failed to get live preview:', response.status, response.statusText)
-        alert('Failed to start live preview. Please try again.')
-      }
-    } catch (error) {
-      console.error('Error starting live preview:', error)
-      alert('Error starting live preview. Please check the console for details.')
-    }
-  }
+  // const handleLivePreview = async () => {
+  //   if (!projectId) return
+  //   
+  //   try {
+  //     console.log('Starting live preview for project:', projectId)
+  //     
+  //     // First try to get or start the live preview
+  //     const response = await fetch(`/api/live-preview/${projectId}`)
+  //     
+  //     if (response.ok) {
+  //       const data = await response.json()
+  //       console.log('Live preview response:', data)
+  //       
+  //       if (data.previewUrl) {
+  //         // Open live preview in new tab
+  //         window.open(data.previewUrl, '_blank')
+  //       } else {
+  //         console.error('No preview URL available')
+  //         alert('Live preview is starting... Please try again in a few seconds.')
+  //       }
+  //     } else {
+  //       console.error('Failed to get live preview:', response.status, response.statusText)
+  //       alert('Failed to start live preview. Please try again.')
+  //     }
+  //   } catch (error) {
+  //     console.error('Error starting live preview:', error)
+  //     alert('Error starting live preview. Please check the console for details.')
+  //   }
+  // }
 
   return (
     <div className="h-screen overflow-hidden bg-black">

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { GeneratedContent, AIAgentState, ConversationMessage } from '@/types'
 import { extractPreviewFromHTML, separateCodeAndText } from '@/libs/utils'
 
@@ -56,7 +56,7 @@ export const useAIAgent = () => {
       const decoder = new TextDecoder()
       let aggregated = ''
       let finalContent: GeneratedContent | null = null
-      let hasPreviewStarted = false
+      // const hasPreviewStarted = false
 
       // Set initial loading state showing both preview and code are being generated
       setState(prev => ({

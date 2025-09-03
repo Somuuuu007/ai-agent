@@ -1,10 +1,17 @@
 // Single-model rate limiting and queue management system
+interface ErrorWithStatus {
+  status?: number
+  statusCode?: number  
+  message?: string
+  headers?: { [key: string]: string }
+}
+
 export interface RetryOptions {
   maxRetries: number
   baseDelay: number
   maxDelay: number
   backoffFactor: number
-  retryCondition?: (error: any) => boolean
+  retryCondition?: (error: unknown) => boolean
 }
 
 export class RetryableError extends Error {
@@ -22,9 +29,9 @@ export class RetryableError extends Error {
 class RequestQueue {
   private queue: Array<{
     id: string
-    resolve: (value: any) => void
-    reject: (error: any) => void
-    request: () => Promise<any>
+    resolve: (value: unknown) => void
+    reject: (error: unknown) => void
+    request: () => Promise<unknown>
     timestamp: number
   }> = []
   private processing = false
@@ -50,9 +57,9 @@ class RequestQueue {
       // Add to queue
       this.queue.push({
         id: requestId,
-        resolve,
-        reject,
-        request,
+        resolve: resolve as (value: unknown) => void,
+        reject: reject as (error: unknown) => void,
+        request: request as () => Promise<unknown>,
         timestamp: Date.now()
       })
 
@@ -100,10 +107,11 @@ class RequestQueue {
         this.queue.shift()
         currentRequest.resolve(result)
         
-      } catch (error: any) {
+      } catch (error: unknown) {
         this.queue.shift()
+        const errorObj = error as ErrorWithStatus
         
-        if (error?.status === 429 || error?.statusCode === 429) {
+        if (errorObj?.status === 429 || errorObj?.statusCode === 429) {
           this.consecutiveFailures++
           
           // Calculate exponential backoff
@@ -113,7 +121,7 @@ class RequestQueue {
           )
           
           // Use retry-after header if available
-          const retryAfter = error?.headers?.['retry-after']
+          const retryAfter = errorObj?.headers?.['retry-after']
           const finalBackoff = retryAfter ? parseInt(retryAfter) * 1000 : backoffMs
           
           this.backoffUntil = Date.now() + finalBackoff
@@ -141,10 +149,12 @@ class RequestQueue {
       baseDelay: 1000,
       maxDelay: 5000,
       backoffFactor: 2,
-      retryCondition: (error: any) => 
-        error?.status === 429 || 
-        error?.statusCode === 429 ||
-        (error?.status >= 500 && error?.status < 600)
+      retryCondition: (error: unknown) => {
+        const errorObj = error as ErrorWithStatus
+        return !!(errorObj?.status === 429 || 
+          errorObj?.statusCode === 429 ||
+          (errorObj?.status && errorObj.status >= 500 && errorObj.status < 600))
+      }
     }
 
     return withRetry(fn, options)
@@ -173,19 +183,21 @@ export async function withRetry<T>(
     baseDelay,
     maxDelay,
     backoffFactor,
-    retryCondition = (error: any) => 
-      error?.status === 429 || 
-      error?.statusCode === 429 ||
-      (error?.status >= 500 && error?.status < 600)
+    retryCondition = (error: unknown) => {
+      const errorObj = error as ErrorWithStatus
+      return !!(errorObj?.status === 429 || 
+        errorObj?.statusCode === 429 ||
+        (errorObj?.status && errorObj.status >= 500 && errorObj.status < 600))
+    }
   } = options
 
-  let lastError: any
+  let lastError: unknown
   let delay = baseDelay
 
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     try {
       return await fn()
-    } catch (error: any) {
+    } catch (error: unknown) {
       lastError = error
       
       // Don't retry if it's the last attempt or error is not retryable
@@ -194,7 +206,8 @@ export async function withRetry<T>(
       }
 
       // Extract retry delay from rate limit headers if available
-      const retryAfterHeader = error?.headers?.['retry-after']
+      const errorObj = error as ErrorWithStatus
+      const retryAfterHeader = errorObj?.headers?.['retry-after']
       const retryAfterMs = retryAfterHeader ? 
         parseInt(retryAfterHeader) * 1000 : 
         Math.min(delay, maxDelay)

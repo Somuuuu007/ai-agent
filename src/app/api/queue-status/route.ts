@@ -39,7 +39,7 @@ function formatWaitTime(ms: number): string {
   }
 }
 
-function getQueueStatus(queueInfo: any): string {
+function getQueueStatus(queueInfo: { queueLength: number; isProcessing: boolean }): string {
   if (queueInfo.queueLength === 0 && !queueInfo.isProcessing) {
     return 'ready'
   } else if (queueInfo.queueLength === 0 && queueInfo.isProcessing) {

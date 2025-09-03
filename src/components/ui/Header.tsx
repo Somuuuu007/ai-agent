@@ -1,4 +1,4 @@
-import { Sparkles } from 'lucide-react'
+// import { Sparkles } from 'lucide-react'
 import { forwardRef } from 'react'
 import Image from 'next/image'
 

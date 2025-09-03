@@ -68,7 +68,7 @@ export async function POST(req: NextRequest) {
           await fs.writeFile(filePath, cleanContent, 'utf8')
           fixedFiles.push(fileName)
         }
-      } catch (error) {
+      } catch {
         // File doesn't exist or can't be read, skip
         continue
       }
@@ -113,12 +113,12 @@ export async function POST(req: NextRequest) {
                 await fs.writeFile(filePath, cleanContent, 'utf8')
                 fixedFiles.push(`${subDir}/${entry.name}`)
               }
-            } catch (error) {
+            } catch {
               continue
             }
           }
         }
-      } catch (error) {
+      } catch {
         // Directory doesn't exist, skip
         continue
       }

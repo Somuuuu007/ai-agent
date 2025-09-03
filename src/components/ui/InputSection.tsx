@@ -16,8 +16,8 @@ export const InputSection = forwardRef<HTMLDivElement, InputSectionProps>(({
   isLoading, 
   onInputChange, 
   onSubmit,
-  variant = 'centered',
-  compact = false
+  variant = 'centered'
+  // compact = false
 }, ref) => {
   const containerClass = variant === 'centered'
     ? `mx-auto mb-6 px-4 transition-all duration-500 max-w-3xl`

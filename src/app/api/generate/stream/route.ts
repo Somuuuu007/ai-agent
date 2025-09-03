@@ -181,7 +181,7 @@ ONLY use /// file: format with plain text content.
       
       // Detect project type and technologies with more precision
       const hasTailwind = response.includes('tailwind') || response.includes('Tailwind') || response.includes('@tailwind')
-      const hasTypeScript = response.includes('.tsx') || response.includes('.ts')
+      // const hasTypeScript = response.includes('.tsx') || response.includes('.ts')
       const hasRouter = response.includes('react-router') || response.includes('router')
       const hasStateManagement = response.includes('useState') || response.includes('useReducer') || response.includes('Context')
       
@@ -308,26 +308,27 @@ Refresh the page to start a new session.
         if (delta) {
           try {
             await writer.write(encoder.encode(delta))
-          } catch (writeError) {
+          } catch {
             // Client disconnected, stop writing
             break
           }
         }
       }
       
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const errorObj = error as { status?: number; statusCode?: number; message?: string }
       console.error(`Request failed:`, {
-        status: error?.status || error?.statusCode,
-        message: error?.message
+        status: errorObj?.status || errorObj?.statusCode,
+        message: errorObj?.message
       })
       
       let errorMessage = 'Failed to generate response. '
       
-      if (error?.status === 429 || error?.statusCode === 429) {
+      if (errorObj?.status === 429 || errorObj?.statusCode === 429) {
         errorMessage += 'Rate limit exceeded. Please wait a moment before trying again.'
-      } else if (error?.status >= 500) {
+      } else if (errorObj?.status && errorObj.status >= 500) {
         errorMessage += 'Server error occurred. Please try again later.'
-      } else if (error?.message?.includes('timeout')) {
+      } else if (errorObj?.message?.includes('timeout')) {
         errorMessage += 'Request timed out. Please try again.'
       } else {
         errorMessage += 'Please try again.'
@@ -335,13 +336,13 @@ Refresh the page to start a new session.
       
       try {
         await writer.write(encoder.encode(`Error: ${errorMessage}\n`))
-      } catch (writeError) {
+      } catch {
         // Ignore write errors when client disconnected
       }
     } finally {
       try {
         await writer.close()
-      } catch (closeError) {
+      } catch {
         // Stream already closed, ignore
       }
     }

@@ -5,7 +5,7 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
-export const mockGenerateContent = async (_input: string): Promise<GeneratedContent> => {
+export const mockGenerateContent = async (): Promise<GeneratedContent> => {
   // Simulate API delay
   await new Promise(resolve => setTimeout(resolve, 2000))
   
@@ -194,7 +194,7 @@ export const extractPreviewFromHTML = (response: string): string => {
     const htmlDocRegex = /<!DOCTYPE html>[\s\S]*?<\/html>/i
     const htmlMatches = response.match(htmlDocRegex)
     if (htmlMatches) {
-      let htmlContent = htmlMatches[0]
+      const htmlContent = htmlMatches[0]
       
       // Validate it's a complete HTML document
       if (htmlContent.includes('<body') && 
