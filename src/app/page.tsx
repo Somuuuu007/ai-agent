@@ -16,11 +16,11 @@ export default function AIAgentPage() {
     isLoading,
     generatedContent,
     activeTab,
-    
+
     handleInputChange,
     handleSubmit,
     setActiveTab,
-    
+
     lastPrompt,
     conversationHistory,
 
@@ -87,8 +87,8 @@ export default function AIAgentPage() {
   useEffect(() => {
     if (lastPrompt && inputWrapRef.current) {
       // Simple fade-in animation for the input wrapper
-      gsap.fromTo(inputWrapRef.current, 
-        { opacity: 0, y: 20 }, 
+      gsap.fromTo(inputWrapRef.current,
+        { opacity: 0, y: 20 },
         { opacity: 1, y: 0, duration: 0.5, ease: 'power2.out' }
       )
     }
@@ -130,22 +130,20 @@ export default function AIAgentPage() {
         <div className="flex items-center space-x-2">
           <button
             onClick={() => setActiveTab('preview')}
-            className={`flex items-center px-3 py-1 rounded-lg text-xs transition-all ${
-              activeTab === 'preview'
+            className={`flex items-center px-3 py-1 rounded-lg text-xs transition-all ${activeTab === 'preview'
                 ? 'bg-white/15 text-white border border-white/20'
                 : 'bg-white/5 text-white/60 hover:text-white/80 border border-white/5 hover:border-white/15'
-            }`}
+              }`}
           >
             <Eye className="h-3.5 w-3.5 mr-2" />
             Preview
           </button>
           <button
             onClick={() => setActiveTab('code')}
-            className={`flex items-center px-3 py-1 rounded-lg text-xs transition-all ${
-              activeTab === 'code'
+            className={`flex items-center px-3 py-1 rounded-lg text-xs transition-all ${activeTab === 'code'
                 ? 'bg-white/15 text-white border border-white/20'
                 : 'bg-white/5 text-white/60 hover:text-white/80 border border-white/5 hover:border-white/15'
-            }`}
+              }`}
           >
             <Code className="h-3.5 w-3.5 mr-2" />
             Code
@@ -250,7 +248,7 @@ export default function AIAgentPage() {
 
   return (
     <div className={`bg-black ${isMobile ? 'min-h-screen overflow-y-auto' : 'h-screen overflow-hidden'}`}>
-      <div 
+      <div
         className="galaxy-background"
         style={{
           position: 'fixed',
@@ -275,15 +273,15 @@ export default function AIAgentPage() {
         <div ref={leftRef} className="flex flex-col overflow-hidden relative z-10" style={{ height: isMobile ? 'auto' : '100vh', minHeight: isMobile ? '50vh' : undefined }}>
 
           {!lastPrompt ? (
-            <div 
+            <div
               ref={mainContainerRef}
               className="flex-1 flex flex-col justify-center items-center overflow-hidden"
             >
               <div>
-                <Header 
+                <Header
                   ref={headerRef}
-                  showSubtitle={!generatedContent && !isLoading} 
-                  align="center" 
+                  showSubtitle={!generatedContent && !isLoading}
+                  align="center"
                 />
               </div>
               <div className="mt-8 w-full max-w-3xl">
@@ -299,13 +297,13 @@ export default function AIAgentPage() {
           ) : (
             <>
               <div className="flex-shrink-0 px-4 pt-6">
-                <Header 
+                <Header
                   ref={headerRef}
-                  showSubtitle={false} 
-                  align="left" 
+                  showSubtitle={false}
+                  align="left"
                 />
               </div>
-              
+
               <div className="flex-1 overflow-y-auto pl-4 pr-0 pb-4 scrollbar-thin">
                 <div className="space-y-8 max-w-3xl mx-auto w-full">
                   {/* Display conversation history */}
@@ -386,28 +384,28 @@ export default function AIAgentPage() {
                     </>
                   )}
 
-                  {/* Show/Hide output button — sticky at bottom of scroll area, above input */}
+                  {/* Show/Hide output button */}
                   {(generatedContent || viewingPreviousResponse !== null) &&
-                   !conversationHistory.some(msg => msg.content.includes('Rate Limit Exceeded')) && (
-                    <div className="sticky bottom-0 flex justify-start pl-2 pb-2 pt-1">
-                      <button
-                        onClick={() => {
-                          if (viewingPreviousResponse !== null) {
-                            viewCurrentResponse()
-                            setShowOutput(true)
-                          } else {
-                            setShowOutput(v => !v)
+                    !conversationHistory.some(msg => msg.content.includes('Rate Limit Exceeded')) && (
+                      <div className="flex justify-start pl-2 pb-2 pt-1">
+                        <button
+                          onClick={() => {
+                            if (viewingPreviousResponse !== null) {
+                              viewCurrentResponse()
+                              setShowOutput(true)
+                            } else {
+                              setShowOutput(v => !v)
+                            }
+                          }}
+                          className="px-4 py-2 bg-white/5 hover:bg-white/10 border border-white/10 hover:border-white/20 rounded-lg text-white text-xs font-medium transition-all hover:transform hover:-translate-y-0.5"
+                        >
+                          {viewingPreviousResponse !== null
+                            ? 'Hide previous response'
+                            : (showOutput ? 'Hide output' : 'Show output')
                           }
-                        }}
-                        className="px-4 py-2 bg-white/5 hover:bg-white/10 border border-white/10 hover:border-white/20 rounded-lg text-white text-xs font-medium transition-all hover:transform hover:-translate-y-0.5"
-                      >
-                        {viewingPreviousResponse !== null
-                          ? 'Hide previous response'
-                          : (showOutput ? 'Hide output' : 'Show output')
-                        }
-                      </button>
-                    </div>
-                  )}
+                        </button>
+                      </div>
+                    )}
                 </div>
               </div>
 
