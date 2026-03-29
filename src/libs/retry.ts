@@ -236,9 +236,9 @@ export function getQueueInfo() {
 
 // Single model configuration
 export const MODEL_CONFIG = {
-  name: 'qwen/qwen3-coder:free',
-  maxTokens: 15000,
-  temperature: 0.7,
+  name: 'gemini-2.5-flash',
+  maxTokens: 65536,
+  temperature: 1,
   rateLimitInfo: {
     requestsPerMinute: 1000,
     requestsPerHour: 10000,

@@ -29,6 +29,14 @@ export const InputSection = forwardRef<HTMLDivElement, InputSectionProps>(({
         <textarea
           value={input}
           onChange={(e) => onInputChange(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+              e.preventDefault()
+              if (!isLoading && input.trim()) {
+                onSubmit(e as unknown as React.FormEvent)
+              }
+            }
+          }}
           placeholder="Describe what you want to create... (e.g., 'Create a todo list with checkboxes')"
           className={`w-full p-6 pr-16 text-base bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent focus:bg-white/8 resize-none shadow-[inset_0_1px_0_0_rgba(255,255,255,0.06)] scrollbar-thin transition-all`}
           rows={4}

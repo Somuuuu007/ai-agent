@@ -35,7 +35,8 @@ export const useAIAgent = () => {
       ...prev,
       isLoading: true,
       generatedContent: null,
-      lastPrompt: currentPrompt
+      lastPrompt: currentPrompt,
+      input: ''
     }))
 
     try {

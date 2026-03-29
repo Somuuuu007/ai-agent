@@ -16,103 +16,87 @@ export async function POST(req: NextRequest) {
     return new Response('Invalid prompt', { status: 400 })
   }
 
-  const apiKey = process.env.OPENROUTER_API_KEY
+  // Gemini is the default/primary provider. OpenRouter is fallback only.
+  const geminiKey = process.env.GEMINI_API_KEY
+  const openrouterKey = process.env.OPENROUTER_API_KEY
+  const isGemini = !!geminiKey
+  const apiKey = geminiKey || openrouterKey
+
   if (!apiKey) {
-    return new Response('Missing API key', { status: 500 })
+    return new Response('Missing API key. Set GEMINI_API_KEY in .env.local', { status: 500 })
   }
 
+  console.log(`Provider: ${isGemini ? 'Google Gemini (primary)' : 'OpenRouter (fallback)'}`)
+
   const openai = new OpenAI({
-    baseURL: 'https://openrouter.ai/api/v1',
+    baseURL: isGemini
+      ? 'https://generativelanguage.googleapis.com/v1beta/openai/'
+      : 'https://openrouter.ai/api/v1',
     apiKey,
-    // Optional ranking headers
-    defaultHeaders: {
-      'HTTP-Referer': process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000',
-      'X-Title': process.env.NEXT_PUBLIC_SITE_NAME || 'AI Agent'
-    }
+    ...(isGemini ? {} : {
+      defaultHeaders: {
+        'HTTP-Referer': process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000',
+        'X-Title': process.env.NEXT_PUBLIC_SITE_NAME || 'AI Agent'
+      }
+    })
   })
 
-  const firstRequestSystemInstruction = `Expert software engineer. Generate production-quality Vite projects.
+  const firstRequestSystemInstruction = `You are an expert software engineer. Generate production-quality Vite + React + TypeScript + Tailwind CSS projects.
 
-**🚨 ABSOLUTE RULE: NO MARKDOWN CODE BLOCKS EVER 🚨**
-NEVER use triple backticks with json, typescript, html, css or ANY code blocks around file contents.
-ONLY use /// file: format with plain text content.
+STRICT OUTPUT FORMAT — follow this EXACTLY, in this order:
 
-**CRITICAL: PURE VITE PROJECTS ONLY. No Next.js files (next.config.js, app/layout.tsx, app/). Use src/ structure.**
+==================================================
+STEP 1 — Write the preview file using this marker:
+/// file: preview.html
+<!DOCTYPE html>
+... (complete self-contained HTML using Tailwind CDN, no external dependencies)
+</html>
 
-Stack: React 18.3+, TypeScript, Tailwind CSS, Vite
+==================================================
+STEP 2 — Write project overview and setup using these exact markers:
 
-**Response Structure:**
-1. Project Overview (brief description)
-2. Setup Instructions (detailed step-by-step guide)
+=== PROJECT OVERVIEW ===
+(2-4 sentences describing what the project does and its tech stack)
 
-**Setup Instructions Format:**
-Always provide clear, numbered steps:
-1. Create a new folder for your project
-2. Create a new Vite project using "npm create vite@latest"
-3. Copy all the generated files into their respective locations  
-4. Open terminal in project folder
-5. Run "npm install" to install dependencies
-6. Run "npm run dev" to start development server
-7. Open http://localhost:5173 in your browser
+=== SETUP INSTRUCTIONS ===
+1. Create a new folder and open terminal inside it
+2. Run: npm create vite@latest . -- --template react-ts
+3. Delete the src folder contents, then paste all generated files into their locations
+4. Run: npm install
+5. Run: npm run dev
+6. Open: http://localhost:5173
 
-**Output Format:**
-1. **preview.html first** (functional preview with Tailwind CDN)
-2. **Project overview**
-3. **Setup instructions** (step-by-step)
-4. **Files using /// file: path/name format**
+==================================================
+STEP 3 — Write ALL project files using this marker format:
+/// file: path/filename.ext
+(raw file content — NO triple backticks, NO markdown fences, just plain text)
 
-**ABSOLUTELY CRITICAL - NO MARKDOWN CODE BLOCKS:**
-- NEVER use triple backticks json, javascript, typescript, html, css or ANY code blocks
-- NEVER wrap file contents in markdown formatting
-- Use ONLY the /// file: format
-- File contents must be RAW text without any wrapping
+/// file: next-file.ext
+(raw file content)
 
-**WRONG FORMAT EXAMPLES (DO NOT DO THIS):**
-Triple backticks json
-{content}
-Triple backticks end
-Triple backticks typescript  
-{content}
-Triple backticks end
+==================================================
 
-**CORRECT FORMAT ONLY:**
-/// file: package.json
-{content}
-
-/// file: src/App.tsx
-{content} 
-        
-**Required Files:**
-- package.json (React 18.3.1, deps/devDeps correct)
-- tsconfig.json (@/* paths)
-- vite.config.ts (@/ aliases)
-- index.html (Vite entry)
-- src/main.tsx (React entry)
-- src/index.css (@tailwind directives if Tailwind)
-- tailwind.config.js, postcss.config.js (if Tailwind)
-
-**Critical Rules:**
-- Use @/ imports, never ../
+ABSOLUTE RULES:
+- NEVER use triple backticks anywhere in the response
+- NEVER wrap file contents in markdown code fences
+- Every file MUST start with /// file: marker
+- preview.html MUST come first, before overview and code files
+- === PROJECT OVERVIEW === and === SETUP INSTRUCTIONS === markers are REQUIRED
+- Use PURE VITE structure only — NO Next.js files (no next.config.js, no app/ folder)
+- Use @/ imports everywhere, never use ../
 - React "^18.3.1", @types/react "^18.3.3"
 - Build tools in devDependencies only
-- No duplicate packages
-- TypeScript everywhere
-- All projects must run with npm install && npm run dev
 
-**Templates:**
-package.json: React 18.3.1, standard Vite scripts, correct dependencies
-tsconfig.json: ES2020, @/* paths mapping
-vite.config.ts: @/ alias configuration  
-index.html: Standard Vite entry point
-src/main.tsx: React.StrictMode wrapper
-src/index.css: @tailwind directives if using Tailwind
-
-**Error Prevention:**
-- No Next.js files in Vite projects
-- No relative imports, use @/
-- Build tools only in devDependencies
-- Match tsconfig paths with vite aliases
-- Validate JSON syntax`
+Required files to generate:
+- package.json
+- tsconfig.json
+- vite.config.ts
+- index.html
+- src/main.tsx
+- src/index.css
+- src/App.tsx
+- tailwind.config.js + postcss.config.js (always include Tailwind)
+- All component files needed for the project`
 
   const followUpSystemInstruction = `Expert software engineer continuing existing project modifications. FOLLOW-UP request.
 
@@ -303,15 +287,81 @@ Refresh the page to start a new session.
 
       console.log(`Request processed successfully with model: ${MODEL_CONFIG.name}`)
       
+      // Track thinking state to filter out <think>...</think> blocks
+      // Some models (e.g., Nemotron, DeepSeek) emit reasoning/thinking tokens
+      // that should not be sent to the client
+      let isInsideThinkBlock = false
+      let thinkBuffer = ''
+
       for await (const chunk of stream) {
         const delta = chunk.choices?.[0]?.delta?.content || ''
-        if (delta) {
-          try {
-            await writer.write(encoder.encode(delta))
-          } catch {
-            // Client disconnected, stop writing
-            break
+        if (!delta) continue
+
+        try {
+          // Process the delta to filter out <think> blocks
+          let remaining = delta
+          let outputBuffer = ''
+
+          while (remaining.length > 0) {
+            if (isInsideThinkBlock) {
+              // We're inside a <think> block, look for closing tag
+              const closeIndex = remaining.indexOf('</think>')
+              if (closeIndex !== -1) {
+                // Found closing tag, skip everything up to and including </think>
+                isInsideThinkBlock = false
+                thinkBuffer = ''
+                remaining = remaining.substring(closeIndex + 8) // 8 = '</think>'.length
+              } else {
+                // Still inside think block, discard all remaining content
+                remaining = ''
+              }
+            } else {
+              // We're outside a <think> block, look for opening tag
+              const openIndex = remaining.indexOf('<think>')
+              if (openIndex !== -1) {
+                // Found opening tag, output everything before it
+                outputBuffer += remaining.substring(0, openIndex)
+                isInsideThinkBlock = true
+                thinkBuffer = ''
+                remaining = remaining.substring(openIndex + 7) // 7 = '<think>'.length
+              } else {
+                // Check for partial <think> tag at the end of chunk
+                // e.g., delta ends with "<thi" which could be start of "<think>"
+                const partialMatch = remaining.match(/<t(?:h(?:i(?:n(?:k)?)?)?)?$/)
+                if (partialMatch) {
+                  // Buffer the potential partial tag
+                  outputBuffer += remaining.substring(0, partialMatch.index)
+                  thinkBuffer = partialMatch[0]
+                  remaining = ''
+                } else {
+                  // No think tags found, flush any buffered partial tag and output everything
+                  if (thinkBuffer) {
+                    outputBuffer += thinkBuffer
+                    thinkBuffer = ''
+                  }
+                  outputBuffer += remaining
+                  remaining = ''
+                }
+              }
+            }
           }
+
+          // Write filtered output to client
+          if (outputBuffer) {
+            await writer.write(encoder.encode(outputBuffer))
+          }
+        } catch {
+          // Client disconnected, stop writing
+          break
+        }
+      }
+
+      // Flush any remaining buffered content (partial tag that never completed)
+      if (thinkBuffer && !isInsideThinkBlock) {
+        try {
+          await writer.write(encoder.encode(thinkBuffer))
+        } catch {
+          // Client disconnected, ignore
         }
       }
       
